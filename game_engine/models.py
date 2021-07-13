@@ -1,5 +1,6 @@
 from django.db import models
 import json
+import datetime
 
 # Create your models here.
 class User(models.Model):
@@ -9,7 +10,9 @@ class User(models.Model):
 
 class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    source_code = models.FileField()
+    source_code = models.FileField(upload_to= lambda instance, filename: f"{instance.user.id}/"
+                                                                         f"{datetime.datetime.now().timestamp()}."
+                                                                         f"{filename}")
     commit_time = models.DateTimeField()
 
 class UserPerformance(models.Model):
@@ -38,5 +41,7 @@ class MatchPlayersField(models.TextField):
         return json.dumps(value)
 
 class Match(models.Model):
-    in_progress = models.BooleanField()
+    allocated = models.BooleanField(default=False)
+    in_progress = models.BooleanField(default=False)
+    over = models.BooleanField(default=False)
     players = MatchPlayersField()

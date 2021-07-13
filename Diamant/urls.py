@@ -21,6 +21,8 @@ from game_engine import views
 router = routers.DefaultRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'matches', views.MatchViewSet)
+router.register(r'requestMatch', views.MatchProvider, basename="requestMatch")
+router.register(r'code_list', views.UserCodeViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
