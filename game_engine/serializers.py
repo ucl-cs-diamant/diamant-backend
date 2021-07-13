@@ -1,20 +1,18 @@
-from django.contrib.auth.models import User, Group
-from game_engine.models import Match
+from game_engine.models import Match, User, UserPerformance
 from rest_framework import serializers
 
-
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = User
-        fields = ['url', 'username', 'email', 'groups']
-
-
-class GroupSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = Group
-        fields = ['url', 'name']
 
 class MatchSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Match
-        fields = ['in_progress', 'players']
+        fields = ['id', 'in_progress', 'players']
+
+class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = UserPerformance
+        fields = ['user', 'mmr', 'games_played']
+
+class UserSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email_address', 'github_username', 'student_id']

@@ -3,3 +3,6 @@ Django
 djangorestframework
 markdown
 django-filter
+celery
+django-celery-results
+django-celery-beat

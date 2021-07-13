@@ -40,4 +40,3 @@ class MatchPlayersField(models.TextField):
 class Match(models.Model):
     in_progress = models.BooleanField()
     players = MatchPlayersField()
-
