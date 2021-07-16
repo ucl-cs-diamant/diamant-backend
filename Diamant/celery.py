@@ -1,13 +1,16 @@
 import os
+from django.conf import settings
+from dotenv import load_dotenv
 
 from celery import Celery
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Diamant.settings')
 
+
 app = Celery('Diamant')
 
-
-app.config_from_object('django.conf:settings', namespace='CELERY')
+load_dotenv(os.path.join(settings.BASE_DIR, ".env"))
+app.config_from_object(settings, namespace='CELERY')
 
 
 app.autodiscover_tasks()

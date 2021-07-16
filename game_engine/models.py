@@ -2,28 +2,37 @@ from django.db import models
 import json
 import datetime
 
+
 # Create your models here.
 class User(models.Model):
-    email_address = models.CharField(max_length=127)
-    github_username = models.CharField(max_length=40)
-    student_id = models.IntegerField()
+    student_id = models.IntegerField(unique=True)
+    email_address = models.CharField(max_length=127, unique=True)
+    github_username = models.CharField(max_length=40, unique=True)
+
+
+def get_filename(instance, filename):
+    return f"{instance.user.id}/" \
+           f"{datetime.datetime.now().timestamp()}." \
+           f"{filename}"
+
 
 class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    source_code = models.FileField(upload_to= lambda instance, filename: f"{instance.user.id}/"
-                                                                         f"{datetime.datetime.now().timestamp()}."
-                                                                         f"{filename}")
+    source_code = models.FileField(upload_to=get_filename)
     commit_time = models.DateTimeField()
+
 
 class UserPerformance(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     mmr = models.DecimalField(max_digits=8, decimal_places=4)
     games_played = models.IntegerField()
 
+
 class MatchPlayersField(models.TextField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    # noinspection PyMethodMayBeStatic
     def from_db_value(self, value, *_):
         if value is None:
             return value
@@ -39,6 +48,7 @@ class MatchPlayersField(models.TextField):
         if value is None:
             return value
         return json.dumps(value)
+
 
 class Match(models.Model):
     allocated = models.BooleanField(default=False)

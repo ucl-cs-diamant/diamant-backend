@@ -1,8 +1,11 @@
 mysqlclient
-Django
-djangorestframework
+Django~=3.2.5
+djangorestframework~=3.12.4
 markdown
 django-filter
-celery
+celery~=5.1.2
 django-celery-results
 django-celery-beat
+GitPython
+requests~=2.26.0
+python-dotenv~=0.18.0

@@ -11,9 +11,12 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+MEDIA_ROOT = Path.joinpath(BASE_DIR, "media")
 
 
 # Quick-start development settings - unsuitable for production
@@ -24,6 +27,7 @@ SECRET_KEY = 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+load_dotenv(Path.joinpath(BASE_DIR, ".env"))
 
 ALLOWED_HOSTS = []
 
@@ -40,6 +44,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'game_engine',
+    'code_manager',
     'django_celery_results',
     'django_celery_beat',
 ]
