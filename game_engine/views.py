@@ -14,7 +14,6 @@ import random
 import os
 
 
-
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -27,11 +26,14 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True)
-    def get_latest_user_code(self, request, pk=None):
-        code = UserCode.objects.latest("commit_time")
-        resp = HttpResponse(code.source_code.file, content_type="application/octet-stream")
-        resp['Content-Disposition'] = f'attachment; filename={os.path.basename(code.source_code.name)}'
-        return resp
+    def latest_code(self, request, pk=None):
+        user_code = UserCode.objects.filter(user=pk)
+        if user_code.exists():
+            latest_code = user_code.latest("commit_time")
+            resp = HttpResponse(latest_code.source_code.file, content_type="application/octet-stream")
+            resp['Content-Disposition'] = f'attachment; filename={os.path.basename(latest_code.source_code.name)}'
+            return resp
+        return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
 
 
 class MatchViewSet(viewsets.ModelViewSet):
@@ -41,6 +43,7 @@ class MatchViewSet(viewsets.ModelViewSet):
 
 
 class MatchProvider(viewsets.ViewSet):
+    # noinspection PyMethodMayBeStatic
     def list(self, request):
         available_matches = Match.objects.filter(allocated=False, in_progress=False, over=False)
         if available_matches.count() > 0:
