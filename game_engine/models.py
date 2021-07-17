@@ -1,6 +1,7 @@
 from django.db import models
 import json
 import datetime
+from django.utils.translation import ugettext_lazy as _
 
 
 # Create your models here.
@@ -19,7 +20,7 @@ def get_filename(instance, filename):
 class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     source_code = models.FileField(upload_to=get_filename)
-    commit_time = models.DateTimeField()
+    commit_time = models.DateTimeField(unique=True)
 
 
 class UserPerformance(models.Model):
@@ -55,3 +56,6 @@ class Match(models.Model):
     in_progress = models.BooleanField(default=False)
     over = models.BooleanField(default=False)
     players = MatchPlayersField()
+
+    class Meta:
+        verbose_name_plural = _("Matches")

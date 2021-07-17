@@ -1,11 +1,15 @@
 from celery import shared_task
-import concurrent.futures
+# import concurrent.futures
+
+from django.core.files import File
+from game_engine.models import User, UserCode
+
+from git import Repo
 import os
 import requests
 import tempfile
-from game_engine.models import User
-from git import Repo
 import re
+import tarfile
 
 
 def list_classroom_repos(access_token, organization, prefix, params=None):
@@ -76,22 +80,27 @@ def create_user(student_id, student_email, github_username):
         student_object.save()
 
 
+def clone_repo(repo_url: str, destination: str) -> Repo:
+    # cloning of private repository possible by providing <username>:<personal access token> pair
+    # use https://<username>:<personal access token>@github.com/repo_owner/repo_name
+    auth_url_string = f"{os.environ['GITHUB_API_TOKEN_USER']}:{os.environ.get('GITHUB_API_TOKEN')}@github.com/".join(
+        # repo["clone_url"].split("github.com/")
+        repo_url.split("github.com/")
+    )
+    repo = Repo.clone_from(auth_url_string, destination)
+    return repo
+
+
 @shared_task
 def fetch_user_authorization():
     prefix = "test-assignment-"
     repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
-
     for repo in repos:
         username = repo["name"][len(prefix):]
         if not User.objects.filter(github_username=username).exists():
             # if user not exist, clone repo, scan for ID, and create User
             with tempfile.TemporaryDirectory() as temp_dir:
-                # cloning of private repository possible by providing <username>:<personal access token> pair
-                # use https://<username>:<personal access token>@github.com/repo_owner/repo_name
-                auth_url_string = f"{os.environ['GITHUB_API_TOKEN_USER']}:{os.environ.get('GITHUB_API_TOKEN')}@github.com/".join(
-                    repo["clone_url"].split("github.com/")
-                )
-                _ = Repo.clone_from(auth_url_string, temp_dir)
+                clone_repo(repo["clone_url"], temp_dir)
 
                 # todo: ####  ADD A TOKEN CHECK, USERS WILL BE PRE-GENERATED INSTEAD OF BEING CREATED HERE ####
                 for path in os.listdir(temp_dir):
@@ -113,5 +122,23 @@ def clone_repositories():
     # todo: change org and prefix, move to environment file/environment variables
     # prefix = "test-sample-code-"
     # repos = list_classroom_repos(github_api_token, "ucl-cs-diamant", prefix)
+    prefix = "test-sample-code-"
+    repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
+    for repo in repos:
+        username = repo["name"][len(prefix):]
+        if User.objects.filter(github_username=username).exists():
+            # if user exists, clone repo and tar directory (otherwise wait until their user instance is created)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                repo_instance = clone_repo(repo["clone_url"], temp_dir)
+                latest_main_commit_datetime = repo_instance.head.reference.commit.committed_datetime
 
-    pass
+                code_inst, created = UserCode.objects.get_or_create(user=User.objects.get(github_username=username),
+                                                                    commit_time=latest_main_commit_datetime)
+                if created:
+                    with tempfile.TemporaryFile() as temp_file:
+                        with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
+                            for dir_entry in os.listdir(temp_dir):
+                                # arcname removes temp_dir prefix from tar
+                                tar_out.add(os.path.join(temp_dir, dir_entry), arcname=dir_entry)
+                        code_inst.source_code.save(f"{repo['name']}-{repo_instance.head.reference.commit.hexsha}.tar",
+                                                   File(temp_file))
