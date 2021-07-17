@@ -21,6 +21,9 @@ class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     source_code = models.FileField(upload_to=get_filename)
     commit_time = models.DateTimeField(unique=True)
+    has_failed = models.BooleanField(default=False)
+    is_latest = models.BooleanField(default=True)
+    is_in_game = models.BooleanField(default=False)
 
 
 class UserPerformance(models.Model):
@@ -29,6 +32,7 @@ class UserPerformance(models.Model):
     games_played = models.IntegerField()
 
 
+# takes a list of user IDs
 class MatchPlayersField(models.TextField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

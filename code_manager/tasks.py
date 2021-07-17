@@ -127,12 +127,13 @@ def clone_repositories():
     for repo in repos:
         username = repo["name"][len(prefix):]
         if User.objects.filter(github_username=username).exists():
+            user_instance = User.objects.get(github_username=username)
             # if user exists, clone repo and tar directory (otherwise wait until their user instance is created)
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
                 latest_main_commit_datetime = repo_instance.head.reference.commit.committed_datetime
 
-                code_inst, created = UserCode.objects.get_or_create(user=User.objects.get(github_username=username),
+                code_inst, created = UserCode.objects.get_or_create(user=user_instance,
                                                                     commit_time=latest_main_commit_datetime)
                 if created:
                     with tempfile.TemporaryFile() as temp_file:
@@ -142,3 +143,8 @@ def clone_repositories():
                                 tar_out.add(os.path.join(temp_dir, dir_entry), arcname=dir_entry)
                         code_inst.source_code.save(f"{repo['name']}-{repo_instance.head.reference.commit.hexsha}.tar",
                                                    File(temp_file))
+                    if UserCode.objects.filter(user=user_instance, is_latest=True).count() > 1:
+                        last_latest = UserCode.objects.filter(user=user_instance, is_latest=True)[1:]
+                        for elem in last_latest:    # should never be more than one, but this should self-correct if it
+                            elem.is_latest = False  # does happen
+                            elem.save()
