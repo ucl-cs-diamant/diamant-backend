@@ -7,7 +7,7 @@ from game_engine.models import UserCode, Match
 # todo: change from scheduled task to an event driven system
 @shared_task
 def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_queue: int = 8):
-    current_ready_match_count = Match.objects.filter(allocated=False, in_progress=False, over=False).count()
+    current_ready_match_count = Match.objects.filter(allocated=None, in_progress=False, over=False).count()
     if current_ready_match_count < min_games_in_queue:
         matches_to_create = min_games_in_queue - current_ready_match_count
         matches_created = 0

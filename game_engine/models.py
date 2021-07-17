@@ -56,7 +56,8 @@ class MatchPlayersField(models.TextField):
 
 
 class Match(models.Model):
-    allocated = models.BooleanField(default=False)
+    # allocated = models.BooleanField(default=False)
+    allocated = models.DateTimeField(null=True, default=None)
     in_progress = models.BooleanField(default=False)
     over = models.BooleanField(default=False)
     players = MatchPlayersField()

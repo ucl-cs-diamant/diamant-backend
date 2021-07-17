@@ -1,4 +1,6 @@
 from django.http import HttpResponse
+from django.utils import timezone
+
 
 from game_engine.models import Match, User, UserCode
 from rest_framework import viewsets
@@ -45,10 +47,10 @@ class MatchViewSet(viewsets.ModelViewSet):
 class MatchProvider(viewsets.ViewSet):
     # noinspection PyMethodMayBeStatic
     def list(self, request):
-        available_matches = Match.objects.filter(allocated=False, in_progress=False, over=False)
+        available_matches = Match.objects.filter(allocated=None, in_progress=False, over=False)
         if available_matches.count() > 0:
             match = random.choice(available_matches)
-            match.allocated = True  # prevents another request to this same endpoint from returning the same match
+            match.allocated = timezone.now()  # prevents another request from getting the same match
             match.save()
             serializer = MatchSerializer(match)
             return Response(serializer.data)
