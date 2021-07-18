@@ -28,7 +28,7 @@ class UserCode(models.Model):
 
 class UserPerformance(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    mmr = models.DecimalField(max_digits=8, decimal_places=4)
+    mmr = models.DecimalField(max_digits=8, decimal_places=4, default=2500.0000)
     games_played = models.IntegerField()
 
 
@@ -64,3 +64,13 @@ class Match(models.Model):
 
     class Meta:
         verbose_name_plural = _("Matches")
+
+
+class MatchResult(models.Model):
+    players = MatchPlayersField()
+    winners = MatchPlayersField()
+    time_started = models.DateTimeField()
+    time_finished = models.DateTimeField()
+
+    class Meta:
+        verbose_name_plural = _("Match results")

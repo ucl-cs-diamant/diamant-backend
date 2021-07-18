@@ -23,8 +23,9 @@ from django.conf.urls.static import static
 router = routers.DefaultRouter()
 router.register(r'users', views.UserViewSet)
 router.register(r'matches', views.MatchViewSet)
-router.register(r'requestMatch', views.MatchProvider, basename="requestMatch")
+router.register(r'request_match', views.MatchProvider, basename="request_match")
 router.register(r'code_list', views.UserCodeViewSet)
+
 
 urlpatterns = [
     path('', include(router.urls)),

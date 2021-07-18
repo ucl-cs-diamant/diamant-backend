@@ -1,15 +1,15 @@
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.db.models import F
 
 
-from game_engine.models import Match, User, UserCode
 from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-
+from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
 from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer
 
 import random
@@ -38,14 +38,41 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
 
 
+# todo: much needed unit tests pls ty
 class MatchViewSet(viewsets.ModelViewSet):
     queryset = Match.objects.all()
     serializer_class = MatchSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @action(methods=["GET", "POST"], detail=True, permission_classes=[])
+    def report_match(self, request, pk=None):
+        if "winners" in request.data and isinstance(request.data["winners"], list):
+            match = Match.objects.get(pk=pk)
+            match_players = match.players
+            winners = request.data["winners"]
+            losers = set(match_players).difference(set(winners))
+            if set(winners).issubset(set(match_players)):
+                match_result = MatchResult()
+                match_result.players = Match.objects.get(pk=pk).players
+                match_result.winners = request.data["winners"]
+                match_result.save()
 
+                match.delete()
+
+                UserPerformance.objects.filter(user__pk__in=match_players).update(games_played=F('games_played')+1)
+                UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr')+100)
+                UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr')-100)
+                # todo: implement actual MMR calculation
+
+                return HttpResponse(status=status.HTTP_201_CREATED)
+            return JsonResponse({"ok": False, "message": "One or more winner not part of match"},
+                                status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({"ok": False, "message": "No winners provided"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+
+# noinspection PyMethodMayBeStatic
 class MatchProvider(viewsets.ViewSet):
-    # noinspection PyMethodMayBeStatic
     def list(self, request):
         available_matches = Match.objects.filter(allocated=None, in_progress=False, over=False)
         if available_matches.count() > 0:
