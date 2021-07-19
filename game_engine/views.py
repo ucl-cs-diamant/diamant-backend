@@ -2,7 +2,6 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.db.models import F
 
-
 from rest_framework import viewsets
 from rest_framework import permissions
 from rest_framework import status
@@ -27,7 +26,7 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserCodeSerializer(objects, many=True, context={'request': request})
         return Response(serializer.data)
 
-    @action(detail=True)
+    @action(detail=True, permission_classes=[])
     def latest_code(self, request, pk=None):
         user_code = UserCode.objects.filter(user=pk)
         if user_code.exists():
@@ -53,18 +52,25 @@ class MatchViewSet(viewsets.ModelViewSet):
             losers = set(match_players).difference(set(winners))
             if set(winners).issubset(set(match_players)):
                 match_result = MatchResult()
+                match_result.time_started = match.allocated
                 match_result.players = Match.objects.get(pk=pk).players
                 match_result.winners = request.data["winners"]
                 match_result.save()
 
                 match.delete()
 
-                UserPerformance.objects.filter(user__pk__in=match_players).update(games_played=F('games_played')+1)
-                UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr')+100)
-                UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr')-100)
-                # todo: implement actual MMR calculation
+                for player in match_players:
+                    up_instance, created = UserPerformance.objects.get_or_create(user=User.objects.get(pk=player))
+                    up_instance.games_played += 1
+                    up_instance.save()
+                # UserPerformance.objects.filter(user__pk__in=match_players).update(games_played=F('games_played')+1)
+                UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr') + 100)
+                UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr') - 100)
 
+                UserCode.objects.filter(user__pk__in=match_players).update(is_in_game=False)
+                # todo: implement actual MMR calculation
                 return HttpResponse(status=status.HTTP_201_CREATED)
+
             return JsonResponse({"ok": False, "message": "One or more winner not part of match"},
                                 status=status.HTTP_400_BAD_REQUEST)
         return JsonResponse({"ok": False, "message": "No winners provided"},
@@ -74,13 +80,13 @@ class MatchViewSet(viewsets.ModelViewSet):
 # noinspection PyMethodMayBeStatic
 class MatchProvider(viewsets.ViewSet):
     def list(self, request):
-        available_matches = Match.objects.filter(allocated=None, in_progress=False, over=False)
+        available_matches = Match.objects.filter(allocated__isnull=True, in_progress=False, over=False)
         if available_matches.count() > 0:
             match = random.choice(available_matches)
             match.allocated = timezone.now()  # prevents another request from getting the same match
             match.save()
             serializer = MatchSerializer(match)
-            return Response(serializer.data)
+            return JsonResponse(serializer.data)
         return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 

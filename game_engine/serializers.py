@@ -4,9 +4,20 @@ from rest_framework import serializers
 
 
 class MatchSerializer(serializers.HyperlinkedModelSerializer):
+    game_id = serializers.SerializerMethodField('get_pk')
+    players = serializers.SerializerMethodField('get_players')
+
+    @staticmethod
+    def get_players(obj):
+        return obj.players
+
+    @staticmethod
+    def get_pk(obj):
+        return obj.pk
+
     class Meta:
         model = Match
-        fields = ['id', 'in_progress', 'players']
+        fields = ['game_id', 'allocated', 'in_progress', 'players']
 #
 #
 # class MatchResultSerializer(serializers.HyperlinkedModelSerializer):

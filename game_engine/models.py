@@ -2,6 +2,7 @@ from django.db import models
 import json
 import datetime
 from django.utils.translation import ugettext_lazy as _
+from django.utils import timezone
 
 
 # Create your models here.
@@ -29,7 +30,7 @@ class UserCode(models.Model):
 class UserPerformance(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     mmr = models.DecimalField(max_digits=8, decimal_places=4, default=2500.0000)
-    games_played = models.IntegerField()
+    games_played = models.IntegerField(default=0)
 
 
 # takes a list of user IDs
@@ -70,7 +71,7 @@ class MatchResult(models.Model):
     players = MatchPlayersField()
     winners = MatchPlayersField()
     time_started = models.DateTimeField()
-    time_finished = models.DateTimeField()
+    time_finished = models.DateTimeField(default=timezone.now)
 
     class Meta:
         verbose_name_plural = _("Match results")

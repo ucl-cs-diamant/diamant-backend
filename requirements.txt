@@ -11,3 +11,4 @@ requests~=2.26.0
 python-dotenv~=0.18.0
 flake8~=3.9.2
 pre-commit~=2.13.0
+django-allow-cidr
