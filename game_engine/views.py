@@ -43,8 +43,9 @@ class MatchViewSet(viewsets.ModelViewSet):
     serializer_class = MatchSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    @action(methods=["GET", "POST"], detail=True, permission_classes=[])
-    def report_match(self, request, pk=None):
+    # noinspection PyUnusedLocal,PyShadowingBuiltins
+    @action(methods=["POST"], detail=True, permission_classes=[])
+    def report_match(self, request, pk=None, format=None):  # todo: turn into serializer
         if "winners" in request.data and isinstance(request.data["winners"], list):
             match = Match.objects.get(pk=pk)
             match_players = match.players
@@ -69,11 +70,11 @@ class MatchViewSet(viewsets.ModelViewSet):
 
                 UserCode.objects.filter(user__pk__in=match_players).update(is_in_game=False)
                 # todo: implement actual MMR calculation
-                return HttpResponse(status=status.HTTP_201_CREATED)
+                return Response(status=status.HTTP_201_CREATED)
 
-            return JsonResponse({"ok": False, "message": "One or more winner not part of match"},
+            return Response({"ok": False, "message": "One or more winner not part of match"},
                                 status=status.HTTP_400_BAD_REQUEST)
-        return JsonResponse({"ok": False, "message": "No winners provided"},
+        return Response({"ok": False, "message": "No winners provided"},
                             status=status.HTTP_400_BAD_REQUEST)
 
 
