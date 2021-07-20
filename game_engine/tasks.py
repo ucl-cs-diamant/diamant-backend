@@ -27,6 +27,7 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
 
             UserCode.objects.filter(user__in=players).update(is_in_game=True)
             matches_created += 1
+            print(f"Created match {match.pk} with players {match.players}")
 
 
 @shared_task

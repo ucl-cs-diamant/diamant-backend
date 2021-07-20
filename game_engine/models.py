@@ -29,7 +29,7 @@ class UserCode(models.Model):
 
 class UserPerformance(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    mmr = models.DecimalField(max_digits=8, decimal_places=4, default=2500.0000)
+    mmr = models.DecimalField(max_digits=8, decimal_places=2, default=2500.00)
     games_played = models.IntegerField(default=0)
 
 
