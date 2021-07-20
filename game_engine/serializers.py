@@ -28,7 +28,7 @@ class MatchSerializer(serializers.HyperlinkedModelSerializer):
 class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = UserPerformance
-        fields = ['user', 'mmr', 'games_played']
+        fields = '__all__'
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

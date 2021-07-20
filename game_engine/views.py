@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
-from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer
+from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
 
 import random
 import os
@@ -73,9 +73,9 @@ class MatchViewSet(viewsets.ModelViewSet):
                 return Response(status=status.HTTP_201_CREATED)
 
             return Response({"ok": False, "message": "One or more winner not part of match"},
-                                status=status.HTTP_400_BAD_REQUEST)
-        return Response({"ok": False, "message": "No winners provided"},
                             status=status.HTTP_400_BAD_REQUEST)
+        return Response({"ok": False, "message": "No winners provided"},
+                        status=status.HTTP_400_BAD_REQUEST)
 
 
 # noinspection PyMethodMayBeStatic
@@ -95,3 +95,9 @@ class UserCodeViewSet(viewsets.ModelViewSet):
     queryset = UserCode.objects.all()
     serializer_class = UserCodeSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+
+class UserPerformanceViewSet(viewsets.ModelViewSet):
+    queryset = UserPerformance.objects.all()
+    serializer_class = UserPerformanceSerializer
+    permission_classes = []
