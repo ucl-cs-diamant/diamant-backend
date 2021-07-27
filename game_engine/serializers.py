@@ -1,11 +1,13 @@
 from game_engine.models import Match, User, UserPerformance, UserCode
 # from game_engine.models import MatchResult
 from rest_framework import serializers
+import os
 
 
 class MatchSerializer(serializers.HyperlinkedModelSerializer):
     game_id = serializers.SerializerMethodField('get_pk')
     players = serializers.SerializerMethodField('get_players')
+    decision_timeout = serializers.SerializerMethodField('get_decision_timeout')
 
     @staticmethod
     def get_players(obj):
@@ -15,9 +17,18 @@ class MatchSerializer(serializers.HyperlinkedModelSerializer):
     def get_pk(obj):
         return obj.pk
 
+    @staticmethod
+    def get_decision_timeout(_):
+        timeout = os.environ.get("PLAYER_DECISION_TIMEOUT")
+        try:
+            timeout = float(timeout)
+        except ValueError:
+            raise ValueError(f"PLAYER_DECISION_TIMEOUT: {timeout} is not a valid float")
+        return timeout
+
     class Meta:
         model = Match
-        fields = ['game_id', 'allocated', 'in_progress', 'players']
+        fields = ['game_id', 'allocated', 'in_progress', 'players', 'decision_timeout']
 #
 #
 # class MatchResultSerializer(serializers.HyperlinkedModelSerializer):
