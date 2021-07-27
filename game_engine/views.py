@@ -92,6 +92,7 @@ class MatchProvider(viewsets.ViewSet):
         if available_matches.count() > 0:
             match = random.choice(available_matches)
             match.allocated = timezone.now()  # prevents another request from getting the same match
+            match.in_progress = True
             match.save()
             serializer = MatchSerializer(match)
             return JsonResponse(serializer.data)

@@ -44,6 +44,7 @@ def scrub_dead_matches():
     in_progress_matches = Match.objects.filter(in_progress=True)
     for match in in_progress_matches:
         if (timezone.now() - match.allocated).total_seconds() >= timeout:
+            print(f"Match {match.pk} dead, removing.")
             players = match.players
             UserCode.objects.filter(user__in=players).update(is_in_game=False)
             match.delete()
