@@ -46,9 +46,12 @@ class MatchViewSet(viewsets.ModelViewSet):
     # noinspection PyUnusedLocal,PyShadowingBuiltins
     @action(methods=["POST"], detail=True, permission_classes=[])
     def report_match(self, request, pk=None, format=None):  # todo: turn into serializer
-        # print(request.data)
-        if "winners" in request.data and isinstance(request.data["winners"], list):
+        try:
             match = Match.objects.get(pk=pk)
+        except Match.DoesNotExist:
+            return Response({"ok": False, "message": "Match has been timed out"}, status=status.HTTP_410_GONE)
+
+        if "winners" in request.data and isinstance(request.data["winners"], list):
             match_players = match.players
             winners = request.data["winners"]
             losers = set(match_players).difference(set(winners))

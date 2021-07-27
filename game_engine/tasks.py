@@ -1,6 +1,9 @@
+import os
+
 from celery import shared_task
 
 from game_engine.models import UserCode, Match
+from django.utils import timezone
 # from game_engine.models import UserPerformance
 
 
@@ -32,4 +35,15 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
 
 @shared_task
 def scrub_dead_matches():
-    pass
+    timeout = os.environ.get("MATCH_TIMEOUT", "60")
+    try:
+        timeout = float(timeout)
+    except ValueError:
+        raise ValueError(f"MATCH_TIMEOUT: {timeout} is not a valid float")
+
+    in_progress_matches = Match.objects.filter(in_progress=True)
+    for match in in_progress_matches:
+        if (timezone.now() - match.allocated).total_seconds() >= timeout:
+            players = match.players
+            UserCode.objects.filter(user__in=players).update(is_in_game=False)
+            match.delete()
