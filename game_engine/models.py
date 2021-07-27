@@ -4,6 +4,8 @@ import datetime
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 
+from jsonfield import JSONField
+
 
 # Create your models here.
 class User(models.Model):
@@ -70,6 +72,7 @@ class Match(models.Model):
 class MatchResult(models.Model):
     players = MatchPlayersField()
     winners = MatchPlayersField()
+    match_events = JSONField()
     time_started = models.DateTimeField()
     time_finished = models.DateTimeField(default=timezone.now)
 
