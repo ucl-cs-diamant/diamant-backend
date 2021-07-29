@@ -13,6 +13,7 @@ from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSer
 
 import random
 import os
+from trueskill import Rating, rate
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -66,13 +67,37 @@ class MatchViewSet(viewsets.ModelViewSet):
 
                     match.delete()
 
+                    rating_group = []  # list of player ratings and their win/loss position
+                    ranks = []
+
                     for player in match_players:
                         up_instance, created = UserPerformance.objects.get_or_create(user=User.objects.get(pk=player))
                         up_instance.games_played += 1
                         up_instance.save()
+
+                        # pull player elo and confidence amounts
+                        player_elo = up_instance.mmr
+                        player_confidence = up_instance.confidence
+
+                        rating = Rating(float(player_elo), float(player_confidence))
+                        rating_group.append([rating])
+                        if player in winners:  # 0 is a winning player
+                            ranks.append(0)
+                        else:
+                            ranks.append(1)
+
+                    new_ratings = rate(rating_group, ranks)  # generate new elos based on trueskill
+
+                    for player in match_players:  # update every player with their new elos
+                        up_instance = UserPerformance.objects.get(user__pk=player)
+                        player_rating = new_ratings.pop(0)[0]  # needs two layers to index -> team -> player
+                        up_instance.mmr = player_rating.mu
+                        up_instance.confidence = player_rating.sigma
+                        up_instance.save()
+
                     # UserPerformance.objects.filter(user__pk__in=match_players).update(games_played=F('games_played')+1)
-                    UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr') + 100)
-                    UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr') - 100)
+                    # UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr') + 100)
+                    # UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr') - 100)
 
                     UserCode.objects.filter(user__pk__in=match_players).update(is_in_game=False)
                     # todo: implement actual MMR calculation

@@ -13,3 +13,4 @@ flake8~=3.9.2
 pre-commit~=2.13.0
 django-allow-cidr
 jsonfield
+trueskill

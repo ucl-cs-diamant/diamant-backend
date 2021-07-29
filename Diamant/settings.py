@@ -31,7 +31,7 @@ DEBUG = True
 load_dotenv(Path.joinpath(BASE_DIR, ".env"))
 
 ALLOWED_HOSTS = ['localhost']
-ALLOWED_CIDR_NETS = ['172.17.0.0/16']
+ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16']
 
 
 # Application definition
