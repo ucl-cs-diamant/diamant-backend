@@ -32,7 +32,9 @@ jobs:
           submodules: recursive
           
       - name: Create db connection credentials file
-        run: echo -e "[client]\nhost = mariadb\ndatabase = diamant\nuser = admin\npassword = testpassword\ndefault-character-set = utf8" > mariadb.cnf
+        env: 
+          MARIADB_HOST: mariadb
+        run: echo -e "[client]\nhost = $MARIADB_HOST\ndatabase = diamant\nuser = admin\npassword = testpassword\ndefault-character-set = utf8" > mariadb.cnf
 
       - name: Setup Python
         uses: actions/setup-python@v2
