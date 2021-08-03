@@ -12,11 +12,27 @@ jobs:
   build:
     name: Test
     runs-on: ubuntu-latest
+    
+    services:
+      mariadb:
+        image: mariadb:latest
+        ports:
+          - 3306
+        env:
+          MYSQL_USER: admin
+          MYSQL_PASSWORD: testpassword
+          MYSQL_DATABASE: diamant
+          MYSQL_ROOT_PASSWORD: password
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           submodules: recursive
+          
+      - name: Create db connection credentials file
+        run: echo -e "[client]\nhost = localhost\ndatabase = diamant\nuser = admin\npassword = testpassword\ndefault-character-set = utf8" > mariadb.cnf
 
       - name: Setup Python
         uses: actions/setup-python@v2
