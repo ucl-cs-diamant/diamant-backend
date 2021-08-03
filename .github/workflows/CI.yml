@@ -19,9 +19,6 @@ jobs:
         ports:
           - 3306:3306
         env:
-          MYSQL_USER: admin
-          MYSQL_PASSWORD: testpassword
-          MYSQL_DATABASE: test_
           MYSQL_ROOT_PASSWORD: password
         options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
     
@@ -34,7 +31,7 @@ jobs:
       - name: Create db connection credentials file
         env: 
           MARIADB_HOST: mariadb
-        run: echo -e "[client]\nhost = 127.0.0.1\ndatabase = diamant\nuser = admin\npassword = testpassword\ndefault-character-set = utf8" > mariadb.cnf
+        run: echo -e "[client]\nhost = 127.0.0.1\ndatabase = diamant\nuser = root\npassword = password\ndefault-character-set = utf8" > mariadb.cnf
 
       - name: Setup Python
         uses: actions/setup-python@v2
