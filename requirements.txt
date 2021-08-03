@@ -15,3 +15,4 @@ django-allow-cidr
 jsonfield
 trueskill
 mock
+django-cors-headers~=3.7.0

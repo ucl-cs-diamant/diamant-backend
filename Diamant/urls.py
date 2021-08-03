@@ -26,6 +26,7 @@ router.register(r'user_performances', views.UserPerformanceViewSet)
 router.register(r'matches', views.MatchViewSet)
 router.register(r'request_match', views.MatchProvider, basename="request_match")
 router.register(r'code_list', views.UserCodeViewSet)
+router.register(r'match_history', views.MatchResultViewSet)
 
 
 urlpatterns = [

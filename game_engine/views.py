@@ -10,6 +10,7 @@ from rest_framework.decorators import action
 
 from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
 from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
+from game_engine.serializers import MatchResultSerializer
 
 import random
 import os
@@ -134,3 +135,8 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
     queryset = UserPerformance.objects.all()
     serializer_class = UserPerformanceSerializer
     permission_classes = []
+
+class MatchResultViewSet(viewsets.ModelViewSet):
+    queryset = MatchResult.objects.all()
+    serializer_class = MatchResultSerializer
+    # permission_classes = [permissions.IsAuthenticated]
