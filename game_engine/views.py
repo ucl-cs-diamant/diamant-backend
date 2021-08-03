@@ -67,7 +67,7 @@ class MatchViewSet(viewsets.ModelViewSet):
 
                     match.delete()
 
-                    rating_group = []  # list of player ratings and their win/loss position
+                    rating_group = []  # list of player ratings and their win/loss pos
                     ranks = []
 
                     for player in match_players:
