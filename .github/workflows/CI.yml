@@ -21,7 +21,7 @@ jobs:
         env:
           MYSQL_USER: admin
           MYSQL_PASSWORD: testpassword
-          MYSQL_DATABASE: diamant
+          MYSQL_DATABASE: test_
           MYSQL_ROOT_PASSWORD: password
         options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
     
