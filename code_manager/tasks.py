@@ -110,7 +110,7 @@ def fetch_user_authorization():
                         if (identity := check_identity(path)) is not None:
                             student_id, student_email = identity
                             create_user(student_id, student_email, username)
-                            print(f"Created user: {student_id} - {student_email} - {username}")
+                            # print(f"Created user: {student_id} - {username}")
                             break  # breaks inner loop, resumes outer loop
 
 
