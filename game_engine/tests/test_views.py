@@ -28,6 +28,6 @@ class TestViews(TestCase):
         expected = {'url': 'http://testserver/user_performances/1/', 'user_name': '1', 'mmr': '25.000000',
                     'confidence': '8.3333300', 'games_played': 0, 'user': 'http://testserver/users/1/'}
 
-        response = self.client.get("/users/1/performance_list", follow=True)
+        response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
         print(response)
         self.assertEqual(response.json()[0], expected)
