@@ -20,7 +20,7 @@ from trueskill import Rating, rate
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True)
     def user_code_list(self, request, pk=None):
@@ -37,6 +37,12 @@ class UserViewSet(viewsets.ModelViewSet):
             resp['Content-Disposition'] = f'attachment; filename={os.path.basename(latest_code.source_code.name)}'
             return resp
         return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
+
+    @action(detail=True)
+    def performance_list(self, request, pk=None):
+        objects = UserPerformance.objects.filter(user_id=pk)
+        serializer = UserPerformanceSerializer(objects, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 # todo: much needed unit tests pls ty
