@@ -29,4 +29,5 @@ class TestViews(TestCase):
                     'confidence': '8.3333300', 'games_played': 0, 'user': 'http://testserver/users/1/'}
 
         response = self.client.get("/users/1/performance_list", follow=True)
+        print(response)
         self.assertEqual(response.json()[0], expected)
