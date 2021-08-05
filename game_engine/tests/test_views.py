@@ -25,8 +25,8 @@ class TestViews(TestCase):
                                                                  mmr=25.00,
                                                                  confidence=8.33333)
         user_performance.save()
-        expected = {'url': 'http://testserver/user_performances/1/', 'user_name': '1', 'mmr': '25.000000',
-                    'confidence': '8.3333300', 'games_played': 0, 'user': 'http://testserver/users/1/'}
+        expected = {'url': f'http://testserver/user_performances/{user.pk}/', 'user_name': '1', 'mmr': '25.000000',
+                    'confidence': '8.3333300', 'games_played': 0, 'user': f'http://testserver/users/{user.pk}/'}
 
         response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
         print(response)
