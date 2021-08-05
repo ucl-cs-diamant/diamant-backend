@@ -97,21 +97,24 @@ def fetch_user_authorization():
     repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
     for repo in repos:
         username = repo["name"][len(prefix):]
-        if not User.objects.filter(github_username=username).exists():
-            # if user not exist, clone repo, scan for ID, and create User
-            with tempfile.TemporaryDirectory() as temp_dir:
-                clone_repo(repo["clone_url"], temp_dir)
+        if User.objects.filter(github_username=username).exists():
+            continue
+        # if user not exist, clone repo, scan for ID, and create User
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clone_repo(repo["clone_url"], temp_dir)
 
-                # todo: ####  ADD A TOKEN CHECK, USERS WILL BE PRE-GENERATED INSTEAD OF BEING CREATED HERE ####
-                for path in os.listdir(temp_dir):
-                    path = os.path.join(temp_dir, path)
-                    if os.path.isfile(path) and os.stat(path).st_size < 1024:  # skip over large files
-                        # todo: verify correctness. written with very little sleep
-                        if (identity := check_identity(path)) is not None:
-                            student_id, student_email = identity
-                            create_user(student_id, student_email, username)
-                            # print(f"Created user: {student_id} - {username}")
-                            break  # breaks inner loop, resumes outer loop
+            # todo: ####  ADD A TOKEN CHECK, USERS WILL BE PRE-GENERATED INSTEAD OF BEING CREATED HERE ####
+            for path in os.listdir(temp_dir):
+                path = os.path.join(temp_dir, path)
+                if os.path.isfile(path) and os.stat(path).st_size >= 1024:  # skip over large files
+                    continue
+                if (identity := check_identity(path)) is None:
+                    continue
+
+                student_id, student_email = identity
+                create_user(student_id, student_email, username)
+                # print(f"Created user: {student_id} - {username}")
+                break  # breaks inner loop, resumes outer loop
 
 
 @shared_task
