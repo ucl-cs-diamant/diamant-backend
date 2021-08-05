@@ -72,4 +72,4 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 class UserCodeSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = UserCode
-        fields = ['user', 'source_code', 'commit_time']
+        fields = ['user', 'source_code', 'commit_time', 'has_failed']
