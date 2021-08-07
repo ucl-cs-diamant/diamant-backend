@@ -1,5 +1,3 @@
-import json
-
 from game_engine.models import Match, User, UserPerformance, UserCode
 from game_engine.models import MatchResult
 from rest_framework import serializers
@@ -8,11 +6,15 @@ import os
 
 class MatchResultSerializer(serializers.HyperlinkedModelSerializer):
     match_events = serializers.SerializerMethodField('load_json')
+    match_id = serializers.SerializerMethodField('get_pk')
 
     @staticmethod
     def load_json(obj):  # makes serializer use actual json instead of string
         return obj.match_events
 
+    @staticmethod
+    def get_pk(obj):
+        return obj.pk
 
     class Meta:
         model = MatchResult

@@ -1,6 +1,5 @@
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
-from django.db.models import F
 
 from rest_framework import viewsets
 from rest_framework import permissions
@@ -53,6 +52,12 @@ class UserViewSet(viewsets.ModelViewSet):
         objects = MatchResult.objects.filter(players__contains=pk).order_by('-time_finished')
         if objects.count() == 0:
             return Response(None, status=status.HTTP_204_NO_CONTENT)
+
+        page = self.paginate_queryset(objects)
+        if page is not None:
+            serializer = MatchResultSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+
         serializer = MatchResultSerializer(objects, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -74,7 +79,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         if "winners" in request.data and isinstance(request.data["winners"], list):
             match_players = match.players
             winners = request.data["winners"]
-            losers = set(match_players).difference(set(winners))
+            # losers = set(match_players).difference(set(winners))
             if set(winners).issubset(set(match_players)):
                 if "match_history" in request.data and isinstance(request.data["match_history"], list):
                     match_result = MatchResult()
