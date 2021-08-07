@@ -48,6 +48,14 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = UserPerformanceSerializer(objects, many=True, context={'request': request})
         return Response(serializer.data)
 
+    @action(detail=True)
+    def user_match_list(self, request, pk=None):
+        objects = MatchResult.objects.filter(players__contains=pk).order_by('-time_finished')
+        if objects.count() == 0:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+        serializer = MatchResultSerializer(objects, many=True, context={'request': request})
+        return Response(serializer.data)
+
 
 # todo: much needed unit tests pls ty
 class MatchViewSet(viewsets.ModelViewSet):
@@ -145,6 +153,7 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
     queryset = UserPerformance.objects.all()
     serializer_class = UserPerformanceSerializer
     permission_classes = []
+
 
 class MatchResultViewSet(viewsets.ModelViewSet):
     queryset = MatchResult.objects.all()
