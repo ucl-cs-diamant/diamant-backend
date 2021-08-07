@@ -48,7 +48,7 @@ class TestViews(TestCase):
                                                        time_started=datetime.datetime(2021, 8, 7, 18, 48,40),
                                                        time_finished=datetime.datetime(2021, 8, 7, 18, 48,45))
         user_match.save()
-        expected = {'url': f'http://testserver/match_history/{user.pk}/', 'match_events': [],
+        expected = {'url': f'http://testserver/match_history/{user_match.pk}/', 'match_events': [],
                     'players': f'[{user.pk}]', 'winners': f'[{user.pk}]',
                     'time_started': '2021-08-07T18:48:40Z', 'time_finished': '2021-08-07T18:48:45Z'}
 
