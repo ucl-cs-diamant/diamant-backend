@@ -55,10 +55,15 @@ class MatchSerializer(serializers.HyperlinkedModelSerializer):
 
 class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
     user_name = serializers.SerializerMethodField('get_user_name')
+    pk = serializers.SerializerMethodField('get_pk')
 
     @staticmethod
     def get_user_name(obj):
         return obj.user.github_username
+
+    @staticmethod
+    def get_pk(obj):
+        return obj.pk
 
     class Meta:
         model = UserPerformance

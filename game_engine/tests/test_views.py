@@ -6,6 +6,9 @@ from rest_framework.test import APIClient, APIRequestFactory
 import game_engine.views as views
 import game_engine.models as models
 
+from decimal import Decimal
+from collections import OrderedDict
+
 
 def create_user(user_id):
     user = models.User.objects.create(student_id=user_id,
@@ -44,7 +47,7 @@ class TestViews(TestCase):
                                                                  confidence=8.33333)
         user_performance.save()
         expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/', 'user_name': '1',
-                    'mmr': '25.000000', 'confidence': '8.3333300', 'games_played': 0,
+                    'mmr': 25.000000, 'pk': user_performance.pk, 'confidence': 8.3333300, 'games_played': 0,
                     'user': f'http://testserver/users/{user.pk}/'}
 
         response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
@@ -92,3 +95,89 @@ class TestViews(TestCase):
                      'time_finished': '2021-08-07T18:48:45Z'}]
 
         self.assertEqual(expected, response.data)
+
+    def test_user_performance_view_set_list_default(self):
+        factory = APIRequestFactory()
+        view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
+
+        user = create_user(1)
+        user_performance = models.UserPerformance.objects.create(user=user,
+                                                                 mmr=25.00,
+                                                                 confidence=8.33333)
+        user_performance.save()
+
+        user2 = create_user(2)
+        user_performance2 = models.UserPerformance.objects.create(user=user2,
+                                                                  mmr=27.00,
+                                                                  confidence=8.33333)
+        user_performance2.save()
+
+        request = factory.get('/', {'sort': 'mmr', 'order': 'desc'})
+        response = view(request)
+
+        expected = [OrderedDict(
+            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
+             ('pk', user_performance2.pk),
+             ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')),
+             ('games_played', 0), ('user', f'http://testserver/users/{user2.pk}/')]), OrderedDict(
+            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
+             ('pk', user_performance.pk),
+             ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
+             ('user', f'http://testserver/users/{user.pk}/')])]
+
+        self.assertSequenceEqual(expected, response.data)
+
+    def test_user_performance_view_set_list_asc(self):
+        factory = APIRequestFactory()
+        view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
+
+        user = create_user(1)
+        user_performance = models.UserPerformance.objects.create(user=user,
+                                                                 mmr=25.00,
+                                                                 confidence=8.33333)
+        user_performance.save()
+
+        user2 = create_user(2)
+        user_performance2 = models.UserPerformance.objects.create(user=user2,
+                                                                  mmr=27.00,
+                                                                  confidence=8.33333)
+        user_performance2.save()
+
+        request = factory.get('/', {'sort': 'mmr', 'order': 'asc'})
+        response = view(request)
+
+        expected = [OrderedDict(
+            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
+             ('pk', user_performance.pk),
+             ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')),
+             ('games_played', 0), ('user', f'http://testserver/users/{user.pk}/')]), OrderedDict(
+            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
+             ('pk', user_performance2.pk),
+             ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
+             ('user', f'http://testserver/users/{user2.pk}/')])]
+
+        self.assertEqual(expected, response.data)
+
+    def test_user_performance_view_set_list_field_error(self):
+        factory = APIRequestFactory()
+        view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
+
+        request = factory.get('/', {'sort': 'bad_key'})
+        response = view(request)
+
+        expected = {'ok': False, 'message': "Unknown sort field 'bad_key'"}
+
+        self.assertEqual(expected, response.data)
+        self.assertEqual(400, response.status_code)
+
+    def test_user_performance_view_set_list_no_content(self):
+        factory = APIRequestFactory()
+        view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
+
+        request = factory.get('/')
+        response = view(request)
+
+        expected = None
+
+        self.assertEqual(expected, response.data)
+        self.assertEqual(204, response.status_code)
