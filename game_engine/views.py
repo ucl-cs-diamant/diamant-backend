@@ -157,7 +157,29 @@ class UserCodeViewSet(viewsets.ModelViewSet):
 class UserPerformanceViewSet(viewsets.ModelViewSet):
     queryset = UserPerformance.objects.all()
     serializer_class = UserPerformanceSerializer
-    permission_classes = []
+    # permission_classes = []
+
+    def list(self, request, **kwargs):
+        sort_by = request.query_params.get("sort", "mmr")
+        sort_order = "-"
+        if request.query_params.get("order", "desc") == "asc":
+            sort_order = ""
+        qs = f"{sort_order}{sort_by}"
+
+        try:
+            objects = UserPerformance.objects.all().order_by(qs)
+        except django.core.exceptions.FieldError:
+            return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if objects.count() == 0:
+            return Response(None, status=status.HTTP_204_NO_CONTENT)
+        page = self.paginate_queryset(objects)
+        if page is not None:
+            serializer = UserPerformanceSerializer(page, many=True, context={'request': request})
+            return self.get_paginated_response(serializer.data)
+        serializer = UserPerformanceSerializer(objects, many=True, context={'request': request})
+        return Response(serializer.data)
 
 
 class MatchResultViewSet(viewsets.ModelViewSet):
