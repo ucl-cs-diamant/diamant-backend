@@ -129,14 +129,14 @@ def update_percentiles(elo_values, user_performance_list):
 
     for user in user_performance_list:
         user.league = user.league & 65520   # 65520 = 1111 1111 1111 0000
-        if user.mmr < lower_percentile:
-            user.league = user.league | Leagues.DIV_ONE.value
-        elif user.mmr == lower_percentile or user.mmr < mid_percentile:
-            user.league = user.league | Leagues.DIV_TWO.value
-        elif user.mmr == mid_percentile or user.mmr < upper_percentile:
-            user.league = user.league | Leagues.DIV_THREE.value
-        elif user.mmr >= upper_percentile:
+        if user.mmr >= upper_percentile:
             user.league = user.league | Leagues.DIV_FOUR.value
+        elif user.mmr >= mid_percentile:
+            user.league = user.league | Leagues.DIV_THREE.value
+        elif user.mmr >= lower_percentile:
+            user.league = user.league | Leagues.DIV_TWO.value
+        elif user.mmr < lower_percentile:
+            user.league = user.league | Leagues.DIV_ONE.value
         user.save()
 
 
