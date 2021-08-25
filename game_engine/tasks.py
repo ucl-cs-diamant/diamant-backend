@@ -102,8 +102,7 @@ def scrub_dead_matches():
             match.delete()
 
 
-@shared_task
-def recalculate_leagues():
+def disable_matchmaking():
     timeout = os.environ.get("MATCH_TIMEOUT", "60")
     maximum_wait = 3
     matchmaking_task = PeriodicTask.objects.filter(task="game_engine.tasks.matchmake").first()
@@ -120,12 +119,13 @@ def recalculate_leagues():
         if wait_count == maximum_wait:
             raise TimeoutError("Matches did not complete within timeout")
 
-    user_performance_list = UserPerformance.objects.all().order_by('mmr')
-    value_list = np.array(list(map(lambda dec: float(dec), user_performance_list.values_list('mmr', flat=True))))
+    return matchmaking_task
 
-    lower_percentile = np.percentile(value_list, 25)
-    mid_percentile = np.percentile(value_list, 50)
-    upper_percentile = np.percentile(value_list, 75)
+
+def update_percentiles(elo_values, user_performance_list):
+    lower_percentile = np.percentile(elo_values, 25)
+    mid_percentile = np.percentile(elo_values, 50)
+    upper_percentile = np.percentile(elo_values, 75)
 
     for user in user_performance_list:
         user.league = user.league & 65520   # 65520 = 1111 1111 1111 0000
@@ -137,8 +137,16 @@ def recalculate_leagues():
             user.league = user.league | Leagues.DIV_THREE.value
         elif user.mmr >= upper_percentile:
             user.league = user.league | Leagues.DIV_FOUR.value
-
         user.save()
+
+
+@shared_task
+def recalculate_leagues():
+    matchmaking_task = disable_matchmaking()
+    user_p_list = UserPerformance.objects.all().order_by('mmr')
+    value_list = np.array(list(map(lambda dec: float(dec), user_p_list.values_list('mmr', flat=True))))
+
+    update_percentiles(value_list, user_p_list)
 
     if matchmaking_task is not None:
         matchmaking_task.enabled = True
