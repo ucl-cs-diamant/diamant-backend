@@ -34,6 +34,7 @@ class UserPerformance(models.Model):
     mmr = models.DecimalField(max_digits=12, decimal_places=6, default=25.00)
     confidence = models.DecimalField(max_digits=12, decimal_places=7, default=8.33333)
     games_played = models.IntegerField(default=0)
+    league = models.IntegerField(default=0)
 
 
 # takes a list of user IDs

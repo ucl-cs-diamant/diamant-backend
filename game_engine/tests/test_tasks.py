@@ -1,3 +1,4 @@
+import os
 from datetime import timedelta
 
 from django.utils import timezone
@@ -6,6 +7,7 @@ from django.core.files import File
 import game_engine.models as models
 import mock
 import game_engine.tasks as tasks
+from django_celery_beat.models import PeriodicTask, IntervalSchedule
 
 
 class TestTasks(TestCase):
@@ -30,7 +32,8 @@ class TestTasks(TestCase):
 
             user_performance = models.UserPerformance.objects.create(user=user,
                                                                      mmr=25.00 + i,
-                                                                     confidence=8.33333 - i)
+                                                                     confidence=8.33333 - i,
+                                                                     league=8)
             self.user_performance_list.append(user_performance)
             user_performance.save()
 
@@ -44,6 +47,12 @@ class TestTasks(TestCase):
 
         players_ingame = models.UserCode.objects.filter(is_in_game=True)
         self.assertEqual(len(players_ingame), 4)
+
+    def test_match_making_min_players(self):
+        models.UserCode.objects.all().first().delete()
+        tasks.matchmake()
+        match = models.Match.objects.all().first()
+        self.assertEqual(len(match.players), 3)
 
     def test_match_making_no_players(self):
         for user in self.user_code_list:
@@ -70,6 +79,9 @@ class TestTasks(TestCase):
         sublist = tasks.extract_players(player_list, 1, 7)
         self.assertIsNone(sublist)
 
+        sublist = tasks.extract_players(player_list, 8, 7)
+        self.assertIsNone(sublist)
+
         sublist = tasks.extract_players(player_list, 3, 3)
         self.assertEqual(sublist, list(player_list.values_list('user', flat=True)[1:]))
 
@@ -88,4 +100,38 @@ class TestTasks(TestCase):
         player_list = tasks.find_players(user_code, 3)
         self.assertEqual(len(player_list), 3)
 
+    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '3'})
+    def test_recalculate_leagues(self):
+        schedule, created = IntervalSchedule.objects.get_or_create(
+            every=10,
+            period=IntervalSchedule.SECONDS,
+        )
 
+        PeriodicTask.objects.create(
+            interval=schedule,
+            name='Matchmake',
+            task='game_engine.tasks.matchmake',
+        )
+
+        tasks.recalculate_leagues()
+        player_list = models.UserPerformance.objects.all().order_by('mmr')
+
+        self.assertEqual([1, 2, 4, 8], list(player_list.values_list('league', flat=True)))
+
+    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '3'})
+    def test_recalculate_leagues_exception(self):
+        schedule, created = IntervalSchedule.objects.get_or_create(
+            every=10,
+            period=IntervalSchedule.SECONDS,
+        )
+
+        PeriodicTask.objects.create(
+            interval=schedule,
+            name='Matchmake',
+            task='game_engine.tasks.matchmake',
+        )
+
+        tasks.matchmake()
+        models.Match.objects.all().update(in_progress=True)
+
+        self.assertRaises(TimeoutError, tasks.recalculate_leagues)

@@ -1,3 +1,4 @@
+from django.core.exceptions import FieldError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
@@ -168,7 +169,7 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
 
         try:
             objects = UserPerformance.objects.all().order_by(qs)
-        except django.core.exceptions.FieldError:
+        except FieldError:
             return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
                             status=status.HTTP_400_BAD_REQUEST)
 

@@ -1,11 +1,17 @@
 import os
 
 import random
+import time
+
 import trueskill
 from celery import shared_task
 
 from game_engine.models import UserCode, Match, UserPerformance
 from django.utils import timezone
+from django_celery_beat.models import PeriodicTask
+import numpy as np
+
+from .utils import Leagues
 # from game_engine.models import UserPerformance
 
 
@@ -65,11 +71,11 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
             if available_players.count() < min_game_size:
                 return
 
+            if available_players.count() < target_game_size:
+                target_game_size = available_players.count()
+
             # todo: implement performance-based matchmaking
-            # players = list(available_players.values_list('user', flat=True).order_by('?')[:target_game_size])
             players = find_players(available_players, target_game_size)
-            # players = random.sample(range(available_players.count()),
-            #                         min(available_players.count(), target_game_size))
             match = Match()
             match.players = players
             match.save()
@@ -94,3 +100,46 @@ def scrub_dead_matches():
             players = match.players
             UserCode.objects.filter(user__in=players).update(is_in_game=False)
             match.delete()
+
+
+@shared_task
+def recalculate_leagues():
+    timeout = os.environ.get("MATCH_TIMEOUT", "60")
+    maximum_wait = 3
+    matchmaking_task = PeriodicTask.objects.filter(task="game_engine.tasks.matchmake").first()
+
+    if matchmaking_task is not None:
+        matchmaking_task.enabled = False
+        matchmaking_task.save()
+
+    wait_count = 0
+    while Match.objects.filter(in_progress=True).count() != 0 and wait_count < maximum_wait:
+        time.sleep(int(timeout))
+        wait_count += 1
+
+        if wait_count == maximum_wait:
+            raise TimeoutError("Matches did not complete within timeout")
+
+    user_performance_list = UserPerformance.objects.all().order_by('mmr')
+    value_list = np.array(list(map(lambda dec: float(dec), user_performance_list.values_list('mmr', flat=True))))
+
+    lower_percentile = np.percentile(value_list, 25)
+    mid_percentile = np.percentile(value_list, 50)
+    upper_percentile = np.percentile(value_list, 75)
+
+    for user in user_performance_list:
+        user.league = user.league & 65520   # 65520 = 1111 1111 1111 0000
+        if user.mmr < lower_percentile:
+            user.league = user.league | Leagues.DIV_ONE.value
+        elif user.mmr == lower_percentile or user.mmr < mid_percentile:
+            user.league = user.league | Leagues.DIV_TWO.value
+        elif user.mmr == mid_percentile or user.mmr < upper_percentile:
+            user.league = user.league | Leagues.DIV_THREE.value
+        elif user.mmr >= upper_percentile:
+            user.league = user.league | Leagues.DIV_FOUR.value
+
+        user.save()
+
+    if matchmaking_task is not None:
+        matchmaking_task.enabled = True
+        matchmaking_task.save()
