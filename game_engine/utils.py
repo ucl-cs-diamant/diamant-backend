@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class Leagues(Enum):
-    DIV_ONE = 1
-    DIV_TWO = 1 << 1
-    DIV_THREE = 1 << 2
-    DIV_FOUR = 1 << 3
+    DIV_1 = 1
+    DIV_2 = 1 << 1
+    DIV_3 = 1 << 2
+    DIV_4 = 1 << 3

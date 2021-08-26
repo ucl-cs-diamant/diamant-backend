@@ -100,7 +100,7 @@ class TestTasks(TestCase):
         player_list = tasks.find_players(user_code, 3)
         self.assertEqual(len(player_list), 3)
 
-    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '3'})
+    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '1'})
     def test_recalculate_leagues(self):
         schedule, created = IntervalSchedule.objects.get_or_create(
             every=10,
@@ -118,7 +118,7 @@ class TestTasks(TestCase):
 
         self.assertEqual([1, 2, 4, 8], list(player_list.values_list('league', flat=True)))
 
-    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '3'})
+    @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '1'})
     def test_recalculate_leagues_exception(self):
         schedule, created = IntervalSchedule.objects.get_or_create(
             every=10,
