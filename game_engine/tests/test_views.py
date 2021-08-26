@@ -48,7 +48,7 @@ class TestViews(TestCase):
         user_performance.save()
         expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/', 'user_name': '1',
                     'mmr': 25.000000, 'pk': user_performance.pk, 'confidence': 8.3333300, 'games_played': 0,
-                    'user': f'http://testserver/users/{user.pk}/'}
+                    'league': 0, 'user': f'http://testserver/users/{user.pk}/'}
 
         response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
         self.assertEqual(response.json()[0], expected)
@@ -119,11 +119,11 @@ class TestViews(TestCase):
             [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
              ('pk', user_performance2.pk),
              ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')),
-             ('games_played', 0), ('user', f'http://testserver/users/{user2.pk}/')]), OrderedDict(
+             ('games_played', 0), ('league', 0), ('user', f'http://testserver/users/{user2.pk}/')]), OrderedDict(
             [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
-             ('user', f'http://testserver/users/{user.pk}/')])]
+             ('league', 0), ('user', f'http://testserver/users/{user.pk}/')])]
 
         self.assertSequenceEqual(expected, response.data)
 
@@ -150,11 +150,11 @@ class TestViews(TestCase):
             [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')),
-             ('games_played', 0), ('user', f'http://testserver/users/{user.pk}/')]), OrderedDict(
+             ('games_played', 0), ('league', 0), ('user', f'http://testserver/users/{user.pk}/')]), OrderedDict(
             [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
              ('pk', user_performance2.pk),
              ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
-             ('user', f'http://testserver/users/{user2.pk}/')])]
+             ('league', 0), ('user', f'http://testserver/users/{user2.pk}/')])]
 
         self.assertEqual(expected, response.data)
 

@@ -16,3 +16,4 @@ jsonfield
 trueskill
 mock
 django-cors-headers~=3.7.0
+numpy

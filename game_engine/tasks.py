@@ -1,12 +1,18 @@
 import os
 
 import random
+import time
+
 import trueskill
 from celery import shared_task
+from django.db.models import QuerySet
 
 from game_engine.models import UserCode, Match, UserPerformance
 from django.utils import timezone
-# from game_engine.models import UserPerformance
+from django_celery_beat.models import PeriodicTask
+import numpy as np
+
+from .utils import Leagues
 
 
 # given a list of players, an index, and number to extract, produce a sublist of the players to participate
@@ -14,14 +20,14 @@ def extract_players(player_list, player_index, target_length):
     if player_index >= player_list.count():
         return None
     if target_length > player_list.count():
-        return None     # return None if the list given is invalid
+        return None  # return None if the list given is invalid
 
     sublist = [player_list[player_index].user.pk]
     offset = 0
 
     while len(sublist) < target_length:
         offset += 1
-        if (player_index - offset) >= 0:    # not out of bounds
+        if (player_index - offset) >= 0:  # not out of bounds
             sublist.insert(0, player_list[player_index - offset].user.pk)
 
         if (player_index + offset) < player_list.count() and len(sublist) < target_length:
@@ -46,7 +52,7 @@ def find_players(user_codes, target_size):
     random_index = random.randrange(0, user_performances.count())
 
     chosen_players = extract_players(user_performances, random_index, target_size)
-    match_quality = evaluate_quality(user_performances, chosen_players)
+    # match_quality = evaluate_quality(user_performances, chosen_players)
 
     # todo: implement method of retrying if match quality is below a standard/cost function
     return chosen_players
@@ -60,16 +66,17 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
         matches_to_create = min_games_in_queue - current_ready_match_count
         matches_created = 0
         while matches_created < matches_to_create:
-            available_players = UserCode.objects.\
-                filter(has_failed=False, is_latest=True, is_in_game=False).select_related('user').only('user', 'is_in_game')
+            available_players = UserCode.objects. \
+                filter(has_failed=False, is_latest=True, is_in_game=False).select_related('user').only('user',
+                                                                                                       'is_in_game')
             if available_players.count() < min_game_size:
                 return
 
+            if available_players.count() < target_game_size:
+                target_game_size = available_players.count()
+
             # todo: implement performance-based matchmaking
-            # players = list(available_players.values_list('user', flat=True).order_by('?')[:target_game_size])
             players = find_players(available_players, target_game_size)
-            # players = random.sample(range(available_players.count()),
-            #                         min(available_players.count(), target_game_size))
             match = Match()
             match.players = players
             match.save()
@@ -94,3 +101,57 @@ def scrub_dead_matches():
             players = match.players
             UserCode.objects.filter(user__in=players).update(is_in_game=False)
             match.delete()
+
+
+def disable_matchmaking():
+    timeout = os.environ.get("MATCH_TIMEOUT", "60")
+    maximum_wait = 3
+    matchmaking_task = PeriodicTask.objects.filter(task="game_engine.tasks.matchmake").first()
+
+    if matchmaking_task is not None:
+        matchmaking_task.enabled = False
+        matchmaking_task.save()
+
+    wait_count = 0
+    while Match.objects.filter(in_progress=True).count() != 0 and wait_count < maximum_wait:
+        time.sleep(int(timeout))
+        wait_count += 1
+
+        if wait_count == maximum_wait:
+            raise TimeoutError("Matches did not complete within timeout")
+
+    return matchmaking_task
+
+
+def update_league(performances: QuerySet, league):
+    for performance in performances:
+        performance.league &= 65520  # 65520 = 0b1111 1111 1111 0000
+        performance.league |= league
+        performance.save()
+
+
+def update_percentiles(percentile_thresholds):
+    for i in range(len(percentile_thresholds) + 1):
+        filter_args = {}
+        if i > 0:
+            filter_args['mmr__gte'] = percentile_thresholds[i - 1]
+        if i < len(percentile_thresholds):
+            filter_args['mmr__lt'] = percentile_thresholds[i]
+        performances = UserPerformance.objects.filter(**filter_args)
+
+        league = Leagues[f"DIV_{i + 1}"].value
+        update_league(performances, league)
+
+
+@shared_task
+def recalculate_leagues(percentiles=(25, 50, 75)):
+    matchmaking_task = disable_matchmaking()
+
+    all_mmr = np.array(list(map(lambda d: float(d),
+                                UserPerformance.objects.all().values_list('mmr', flat=True))))
+    thresholds = sorted(map(lambda p: np.percentile(all_mmr, p), percentiles))  # sort lowest->highest
+    update_percentiles(thresholds)
+
+    if matchmaking_task is not None:
+        matchmaking_task.enabled = True
+        matchmaking_task.save()
