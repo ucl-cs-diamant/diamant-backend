@@ -5,6 +5,7 @@ import time
 
 import trueskill
 from celery import shared_task
+from django.db.models import QuerySet
 
 from game_engine.models import UserCode, Match, UserPerformance
 from django.utils import timezone
@@ -122,6 +123,13 @@ def disable_matchmaking():
     return matchmaking_task
 
 
+def update_league(performances: QuerySet, league):
+    for performance in performances:
+        performance.league &= 65520  # 65520 = 0b1111 1111 1111 0000
+        performance.league |= league
+        performance.save()
+
+
 def update_percentiles(percentile_thresholds):
     for i in range(len(percentile_thresholds) + 1):
         filter_args = {}
@@ -131,10 +139,8 @@ def update_percentiles(percentile_thresholds):
             filter_args['mmr__lt'] = percentile_thresholds[i]
         performances = UserPerformance.objects.filter(**filter_args)
 
-        for performance in performances:
-            performance.league &= 65520  # 65520 = 0b1111 1111 1111 0000
-            performance.league |= Leagues[f"DIV_{i + 1}"].value
-            performance.save()
+        league = Leagues[f"DIV_{i + 1}"].value
+        update_league(performances, league)
 
 
 @shared_task
