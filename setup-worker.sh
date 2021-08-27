@@ -27,8 +27,8 @@ if [[ $(sudo docker ps -a -q) ]]; then
   sudo docker rm "$(sudo docker ps -a -q)";
 fi
 
-sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunner -t ubuntu-gamerunner
-sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
+#sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunner -t ubuntu-gamerunner
+#sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 
 # todo: do the swarm manager creation and setting up service and whatever
 
