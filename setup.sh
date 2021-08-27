@@ -99,7 +99,7 @@ do
       exit
       ;;
     *)
-      read -t 120 -r -p "Continue and set up backend servers? [Y/n] " continue_running || echo; continue_running="Y"
+      read -t 120 -r -p "Continue and set up backend servers? [Y/n] " continue_running || (echo; continue_running="Y")
     esac
   fi
 done
