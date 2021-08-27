@@ -68,6 +68,42 @@ sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunne
 sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 
 # todo: do the swarm manager creation and setting up service and whatever
+# TODO: IMPORTANT NOTE-- CREATE SWARM USING A DIFFERENT DEFAULT ADDRESS POOL
+
+# todo: uncomment this once swarm creation is done above
+#sudo docker node update --label-add registry=true "$(sudo docker node ls --filter "role=manager" --format '{{.ID}}')"
+#sudo docker service create \
+#  --name registry \
+#  --constraint 'node.labels.registry==true' \
+#  --mount source=registry_data,target=/var/lib/registry\
+#  -e REGISTRY_HTTP_ADDR=0.0.0.0:5000 \
+#  --publish published=5000,target=5000 \
+#  --replicas 1 \
+#  registry:2
+#
+#
+#sudo docker tag gamerunner localhost:5000/gamerunner
+#sudo docker push localhost:5000/gamerunner
+#
+#sudo docker service create -e GAMESERVER_HOST=10.24.32.50 -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner
+
+continue_running="placeholder"
+while true
+do
+  if [[ -n "$continue_running" ]]; then
+    case "$continue_running" in [yY])
+      break
+      ;;
+    [nN])
+      echo "All done.";
+      exit
+      ;;
+    *)
+      read -t 120 -r -p "Continue and set up backend servers? [Y/n] " continue_running || echo; continue_running="Y"
+    esac
+  fi
+done
+echo "Continuing...";
 
 
 # clone and run backend
