@@ -69,8 +69,16 @@ def find_optimal_quality(game_size):
     return env.quality(rating_list)
 
 
-def determine_acceptable_match(game_size):
+def determine_acceptable_match(match_quality, game_size, reject_count):
     optimal_q = find_optimal_quality(game_size)
+
+    base_val = 0.1 * optimal_q
+    modifier = 0.05 * optimal_q
+
+    tolerance = base_val + (reject_count * modifier)
+
+    return match_quality > (optimal_q - tolerance)
+    # if match is acceptable, return True
 
 
 # todo: change from scheduled task to an event driven system
@@ -90,8 +98,13 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
             if available_players.count() < target_game_size:
                 target_game_size = available_players.count()
 
-            # todo: implement performance-based matchmaking
+            # find initial batch of players, if not acceptable, keep finding more
             players, quality = find_players(available_players, target_game_size)
+            rejects = 0
+            while not determine_acceptable_match(quality, len(players), rejects):
+                players, quality = find_players(available_players, target_game_size)
+                rejects += 1
+
             match = Match()
             match.players = players
             match.save()

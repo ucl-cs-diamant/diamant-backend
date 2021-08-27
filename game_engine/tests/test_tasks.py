@@ -31,7 +31,7 @@ class TestTasks(TestCase):
             user_code.save()
 
             user_performance = models.UserPerformance.objects.create(user=user,
-                                                                     mmr=25.00 + i,
+                                                                     mmr=25.00 * i,
                                                                      confidence=8.33333 - i,
                                                                      league=8)
             self.user_performance_list.append(user_performance)
@@ -90,14 +90,14 @@ class TestTasks(TestCase):
 
         sublist = tasks.extract_players(user_performance, 1, 3)
         quality = tasks.evaluate_quality(user_performance, sublist)
-        self.assertEqual(quality, 0.24008241712969108)
+        self.assertEqual(quality, 3.7216736982105365e-05)
 
     def test_find_players(self):
         user_code = models.UserCode.objects.all()
-        player_list = tasks.find_players(user_code, 4)
+        player_list, quality = tasks.find_players(user_code, 4)
         self.assertEqual(player_list, list(models.UserCode.objects.values_list('user', flat=True)))
 
-        player_list = tasks.find_players(user_code, 3)
+        player_list, quality = tasks.find_players(user_code, 3)
         self.assertEqual(len(player_list), 3)
 
     @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '1'})
@@ -135,3 +135,28 @@ class TestTasks(TestCase):
         models.Match.objects.all().update(in_progress=True)
 
         self.assertRaises(TimeoutError, tasks.recalculate_leagues)
+
+    def test_optimal_quality(self):
+        three_players = tasks.find_optimal_quality(3)
+        four_players = tasks.find_optimal_quality(4)
+        five_players = tasks.find_optimal_quality(5)
+
+        self.assertEqual(0.2000000128000006, three_players)
+        self.assertEqual(0.08944272768649317, four_players)
+        self.assertEqual(0.04000000512000041, five_players)
+
+    def test_determine_acceptable_match_perfect_quality(self):
+        quality = 0.08944272768649317   # optimal quality for four players
+        self.assertTrue(tasks.determine_acceptable_match(quality, 4, 0))
+
+    def test_determine_acceptable_match_bad_quality(self):
+        quality = 0.0000000001
+        self.assertFalse(tasks.determine_acceptable_match(quality, 4, 0))
+
+    def test_determine_acceptable_match_borderline_quality(self):
+        quality = 0.087
+        self.assertTrue(tasks.determine_acceptable_match(quality, 4, 0))
+
+    def test_determine_acceptable_match_rejects(self):
+        quality = 0.08
+        self.assertTrue(tasks.determine_acceptable_match(quality, 4, 5))
