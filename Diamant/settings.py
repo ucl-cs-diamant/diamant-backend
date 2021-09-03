@@ -30,8 +30,8 @@ SECRET_KEY = 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c
 DEBUG = True
 load_dotenv(Path.joinpath(BASE_DIR, ".env"))
 
-ALLOWED_HOSTS = ['localhost']
-ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16']
+ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
+ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
 
 
 # Application definition
