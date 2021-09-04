@@ -1,10 +1,22 @@
 from django.db import models
 import json
 import datetime
+import secrets
 from django.utils.translation import ugettext_lazy as _
 from django.utils import timezone
 
 from jsonfield import JSONField
+
+
+def hex_token(n_bytes=16):
+    a = secrets.token_hex(nbytes=n_bytes)
+    return a
+
+
+def get_filename(instance, filename):
+    return f"{instance.user.id}/" \
+           f"{datetime.datetime.now().timestamp()}." \
+           f"{filename}"
 
 
 # Create your models here.
@@ -12,12 +24,8 @@ class User(models.Model):
     student_id = models.IntegerField(unique=True)
     email_address = models.CharField(max_length=127, unique=True)
     github_username = models.CharField(max_length=40, unique=True)
-
-
-def get_filename(instance, filename):
-    return f"{instance.user.id}/" \
-           f"{datetime.datetime.now().timestamp()}." \
-           f"{filename}"
+    authentication_token = models.CharField(max_length=36, unique=True,
+                                            editable=False, default=hex_token)
 
 
 class UserCode(models.Model):

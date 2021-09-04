@@ -41,7 +41,7 @@ def exchange_code_for_token(code: str, endpoint="https://github.com/login/oauth/
     headers = {'Accept': 'application/json'}
 
     r = requests.post(endpoint, headers=headers, data=payload)
-    if r.status_code != 200:
+    if r.status_code != 200 or 'error' in r.json():
         return None
     return r.json()
 
