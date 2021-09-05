@@ -14,5 +14,5 @@ urlpatterns = [
     # url(r'user/studentnumber$', views.get_student_number),
     # url(r'deauthorise$', views.deauthorise_app),
     # url(r'user/settings$', views.get_settings)
-    url(r'callback', views.yep_oauth_callback),
+    url(r'callback', views.oauth_code_callback),
 ]
