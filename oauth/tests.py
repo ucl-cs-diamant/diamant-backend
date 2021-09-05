@@ -106,6 +106,7 @@ class UtilsTest(TestCase):
     #
     # exchange_code_for_token
     @mock.patch('requests.post')
+    @mock.patch.dict(os.environ, {'GITHUB_OAUTH_CLIENT_ID': 'not_none', 'GITHUB_OAUTH_CLIENT_SECRET': 'also_not_none'})
     def test_successful_token_exchange(self, mock_post):
         response = requests.Response()
         response.status_code = 200
@@ -117,6 +118,7 @@ class UtilsTest(TestCase):
         self.assertEqual(exchange_result, {})
 
     @mock.patch('requests.post')
+    @mock.patch.dict(os.environ, {'GITHUB_OAUTH_CLIENT_ID': 'not_none', 'GITHUB_OAUTH_CLIENT_SECRET': 'also_not_none'})
     def test_bad_code_token_exchange(self, mock_post):
         response = requests.Response()
         response.status_code = 200
