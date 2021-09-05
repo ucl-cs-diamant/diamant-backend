@@ -24,16 +24,21 @@ a = f"https://github.com/login/oauth/authorize?client_id=b681a270eb0071a810bd&sc
     f"&redirect_uri={redirect_uri}"
 
 
+# todo: replace these views with DRF views
+
+
 @require_http_methods(["GET"])
 def oauth_code_callback(request):
     code = request.GET.get('code', None)
     if code is None:
-        return JsonResponse({'ok': False, 'message': 'oauth code missing in callback request'})
+        return JsonResponse({'ok': False, 'message': 'oauth code missing in callback request'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
     exchange_result = utils.exchange_code_for_token(code)
     if exchange_result is None:
         return JsonResponse({'ok': False, 'message': 'Unable to exchange code for token, please try again. If the '
-                                                     'issue persists, please contact a site administrator'})
+                                                     'issue persists, please contact a site administrator'},
+                            status=status.HTTP_406_NOT_ACCEPTABLE)
 
     github_ident = utils.fetch_github_identity(exchange_result)
     request.session['github_username'] = github_ident['login']
@@ -52,11 +57,13 @@ def link_account(request):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if (link_token := utils.get_token(request)) is None:
-        return JsonResponse({'ok': False, 'message': 'Account link token missing'}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({'ok': False, 'message': 'Account link token missing'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
     matching_user_qs = User.objects.filter(authentication_token=link_token)
     if not matching_user_qs:
-        return JsonResponse({'ok': False, 'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({'ok': False, 'message': 'Invalid token'},
+                            status=status.HTTP_404_NOT_FOUND)
 
     token_user = matching_user_qs.first()
     if token_user.github_username != '':
