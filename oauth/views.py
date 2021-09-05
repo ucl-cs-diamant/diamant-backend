@@ -9,7 +9,6 @@ from game_engine.models import User
 from . import utils
 import urllib.parse
 
-
 # Create your views here.
 # see https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps
 # scopes to use (see https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps )
@@ -46,6 +45,16 @@ def oauth_code_callback(request):
     return JsonResponse(success_response)
 
 
+def get_token(request):
+    link_token = request.GET.get('token', None)
+    if request.method == "POST":
+        link_token = request.POST.get('token', None)
+        if link_token is None:
+            request_data = json.loads(request.body.decode("utf-8"))  # sometimes POST data isn't stored in request.POST
+            link_token = request_data.get('token', None)
+    return link_token
+
+
 # @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def link_account(request):
@@ -53,26 +62,20 @@ def link_account(request):
         return JsonResponse({'ok': False, 'message': "Not logged in, please log in first"},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-    link_token = request.GET.get('token', None)
-    if request.method == "POST":
-        link_token = request.POST.get('token', None)
-        if link_token is None:
-            request_data = json.loads(request.body.decode("utf-8"))
-            link_token = request_data.get('token', None)
-    if link_token is None:
+    if (link_token := get_token) is None:
         return JsonResponse({'ok': False, 'message': 'Account link token missing'}, status=status.HTTP_400_BAD_REQUEST)
 
     matching_user_qs = User.objects.filter(authentication_token=link_token)
     if not matching_user_qs:
         return JsonResponse({'ok': False, 'message': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
 
-    matching_user = matching_user_qs.first()
-    if matching_user.github_username != '':
-        return JsonResponse({'ok': False, 'message': f"Student ID {matching_user.student_id} already "
-                                                     f"linked to {matching_user.github_username}"},
+    token_user = matching_user_qs.first()
+    if token_user.github_username != '':
+        return JsonResponse({'ok': False, 'message': f"Student ID {token_user.student_id} already "
+                                                     f"linked to {token_user.github_username}"},
                             status=status.HTTP_409_CONFLICT)
 
-    matching_user.github_username = github_username
-    matching_user.save()
-    return JsonResponse({'ok': True, 'message': f"Successfully linked student ID {matching_user.student_id} "
+    token_user.github_username = github_username
+    token_user.save()
+    return JsonResponse({'ok': True, 'message': f"Successfully linked student ID {token_user.student_id} "
                                                 f"to {github_username}"}, status=status.HTTP_201_CREATED)
