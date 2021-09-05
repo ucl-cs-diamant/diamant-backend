@@ -1,4 +1,3 @@
-import json
 from django.http import JsonResponse
 # from django.shortcuts import render
 # from django.views.decorators.csrf import csrf_exempt
@@ -25,6 +24,7 @@ a = f"https://github.com/login/oauth/authorize?client_id=b681a270eb0071a810bd&sc
     f"&redirect_uri={redirect_uri}"
 
 
+@require_http_methods(["GET"])
 def oauth_code_callback(request):
     code = request.GET.get('code', None)
     if code is None:
@@ -45,16 +45,6 @@ def oauth_code_callback(request):
     return JsonResponse(success_response)
 
 
-def get_token(request):
-    link_token = request.GET.get('token', None)
-    if request.method == "POST":
-        link_token = request.POST.get('token', None)
-        if link_token is None:
-            request_data = json.loads(request.body.decode("utf-8"))  # sometimes POST data isn't stored in request.POST
-            link_token = request_data.get('token', None)
-    return link_token
-
-
 # @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def link_account(request):
@@ -62,7 +52,7 @@ def link_account(request):
         return JsonResponse({'ok': False, 'message': "Not logged in, please log in first"},
                             status=status.HTTP_401_UNAUTHORIZED)
 
-    if (link_token := get_token) is None:
+    if (link_token := utils.get_token(request)) is None:
         return JsonResponse({'ok': False, 'message': 'Account link token missing'}, status=status.HTTP_400_BAD_REQUEST)
 
     matching_user_qs = User.objects.filter(authentication_token=link_token)

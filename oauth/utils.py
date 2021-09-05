@@ -1,6 +1,7 @@
 import os
 from typing import Union
 
+import json
 import requests
 
 
@@ -34,3 +35,13 @@ def fetch_github_identity(exchange_result: dict, endpoint='https://api.github.co
         return None
     print(r.json())
     return r.json()
+
+
+def get_token(request):
+    link_token = request.GET.get('token', None)
+    if request.method == "POST":
+        link_token = request.POST.get('token', None)
+        if link_token is None:
+            request_data = json.loads(request.body.decode("utf-8"))  # sometimes POST data isn't stored in request.POST
+            link_token = request_data.get('token', None)
+    return link_token
