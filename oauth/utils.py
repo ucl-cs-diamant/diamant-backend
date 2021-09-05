@@ -40,13 +40,13 @@ def fetch_github_identity(exchange_result: dict, endpoint='https://api.github.co
 
 
 def get_token(request):
-    link_token = request.GET.get('token', None)
-    if request.method == "POST":
-        link_token = request.POST.get('token', None)
-        if link_token is None:
-            try:
-                request_data = json.loads(request.body.decode("utf-8"))  # sometimes POST data stored in request.body
-                link_token = request_data.get('token', None)
-            except django.http.request.RawPostDataException:
-                pass
-    return link_token
+    link_token = None
+    try:
+        link_token = request.GET.get('token')
+        if request.method == "POST":
+            # default checks for request.body instead of request.POST, sometimes data gets put in body
+            link_token = request.POST.get('token')
+            link_token = json.loads(request.body.decode("utf-8")).get('token') if link_token is None else link_token
+        return link_token
+    except django.http.request.RawPostDataException:
+        return link_token
