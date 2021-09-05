@@ -39,8 +39,7 @@ def oauth_code_callback(request):
     request.session['github_username'] = github_ident['login']
 
     success_response = {'ok': True, 'message': f"Logged in as {github_ident['login']}."}
-    # if not User.objects.filter(github_username=github_ident['login']).exists():
-    if not User.objects.filter(github_username='dfgsdfjhgbsdfg').exists():
+    if not User.objects.filter(github_username=github_ident['login']).exists():
         success_response['redirect'] = 'oauth/link_account'
     return JsonResponse(success_response)
 
