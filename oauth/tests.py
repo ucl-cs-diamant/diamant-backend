@@ -1,7 +1,12 @@
+import os
 from unittest import mock
 
-from django.test import TestCase
+import json
+import requests
+from django.test import TestCase, RequestFactory
 from game_engine.models import User
+
+import oauth.utils
 
 
 # Create your tests here.
@@ -92,3 +97,104 @@ class LinkAccountEndpoint(TestCase):
         new_user.refresh_from_db()
         self.assertEqual(response.status_code, 201)
         self.assertEqual(new_user.github_username, "ILW8")
+
+
+class UtilsTest(TestCase):
+    def setUp(self) -> None:
+        self.req_factory = RequestFactory()
+
+    #
+    # exchange_code_for_token
+    @mock.patch('requests.post')
+    def test_successful_token_exchange(self, mock_post):
+        response = requests.Response()
+        response.status_code = 200
+        response.json = lambda: {}
+
+        mock_post.return_value = response
+
+        exchange_result = oauth.utils.exchange_code_for_token("test_code")
+        self.assertEqual(exchange_result, {})
+
+    @mock.patch('requests.post')
+    def test_bad_code_token_exchange(self, mock_post):
+        response = requests.Response()
+        response.status_code = 200
+        response.json = lambda: {'error': "it didn't work :("}
+
+        mock_post.return_value = response
+
+        exchange_result = oauth.utils.exchange_code_for_token("test_code")
+        self.assertIsNone(exchange_result)
+
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_missing_github_config(self):
+        exchange_result = oauth.utils.exchange_code_for_token("test_code")
+        self.assertIsNone(exchange_result)
+
+    #
+    # fetch_github_identity
+    @mock.patch('requests.get')
+    def test_successful_get_user(self, mock_get):
+        response = requests.Response()
+        response.status_code = 200
+        response.json = lambda: {}
+
+        mock_get.return_value = response
+
+        exchange_result = oauth.utils.fetch_github_identity({"access_token": "test_token"})
+        self.assertEqual(exchange_result, {})
+
+    @mock.patch('requests.get')
+    def test_bad_token_get_user_200(self, mock_get):
+        response = requests.Response()
+        response.status_code = 200
+        response.json = lambda: {'error': "it didn't work :("}
+
+        mock_get.return_value = response
+
+        exchange_result = oauth.utils.fetch_github_identity({"access_token": "test_token"})
+        self.assertIsNone(exchange_result)
+
+    @mock.patch('requests.get')
+    def test_bad_token_get_user_not_200(self, mock_get):
+        response = requests.Response()
+        response.status_code = 401
+        response.json = lambda: {'error': "it didn't work :("}
+
+        mock_get.return_value = response
+
+        exchange_result = oauth.utils.fetch_github_identity({"access_token": "test_token"})
+        self.assertIsNone(exchange_result)
+
+    #
+    # get_token
+    def test_token_in_get(self):
+        request = self.req_factory.get('/path/does/not/matter', {"token": "good_token"})
+        token = oauth.utils.get_token(request)
+
+        self.assertEqual(token, "good_token")
+
+    def test_get_no_token(self):
+        request = self.req_factory.get("/")
+        token = oauth.utils.get_token(request)
+        self.assertEqual(token, None)
+
+    def test_post_token_in_post_query_dict(self):
+        request = self.req_factory.post('/path/does/not/matter', {"token": "good_token"})
+        token = oauth.utils.get_token(request)
+
+        self.assertEqual(token, "good_token")
+
+    def test_post_token_in_post_body(self):
+        request = self.req_factory.post('/path/does/not/matter',
+                                        data=json.dumps({"token": "good_token"}),
+                                        content_type='application/json')
+        token = oauth.utils.get_token(request)
+
+        self.assertEqual(token, "good_token")
+
+    def test_post_no_token(self):
+        request = self.req_factory.post("/")
+        token = oauth.utils.get_token(request)
+        self.assertEqual(token, None)
