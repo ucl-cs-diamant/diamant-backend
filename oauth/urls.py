@@ -15,4 +15,5 @@ urlpatterns = [
     # url(r'deauthorise$', views.deauthorise_app),
     # url(r'user/settings$', views.get_settings)
     url(r'callback', views.oauth_code_callback),
+    url(r'link_account', views.link_account),
 ]
