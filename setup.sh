@@ -86,7 +86,7 @@ sudo docker service create \
 sudo docker tag gamerunner localhost:5000/gamerunner
 sudo docker push localhost:5000/gamerunner
 
-sudo docker service create -e GAMESERVER_HOST="$orchestrator_ip" -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner
+sudo docker service create -e GAMESERVER_HOST="$orchestrator_ip" -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner --detach
 
 continue_running="placeholder"
 while true
