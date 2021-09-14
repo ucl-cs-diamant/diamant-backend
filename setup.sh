@@ -70,7 +70,7 @@ sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunne
 sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 
 # todo: read and echo worker join key
-sudo docker swarm init --default-addr-pool 10.4.0.0/16
+sudo docker swarm init --advertise-addr "$orchestrator_ip" --default-addr-pool 10.4.0.0/16
 
 sudo docker node update --label-add registry=true "$(sudo docker node ls --filter "role=manager" --format '{{.ID}}')"
 sudo docker service create \
