@@ -2,6 +2,13 @@
 
 trap "echo script failed; exit 1" ERR
 
+# https://stackoverflow.com/a/10520718
+echo "Please input the worker join string. It should look something like this: "
+echo "SWMTKN-1-27xdhssbgl3vm3sxjelykzkpp3xn91hk8ys9x9r39pf46prtbe-bp7mny47bls4adxtozyawiwyf 128.16.80.71:2377"
+read -r -p "Worker join string: " WORKER_JOIN_STRING
+echo
+WORKER_JOIN_TOKEN=${WORKER_JOIN_STRING% *}
+MANAGER_IP=${WORKER_JOIN_STRING#* }
 
 # install general packages
 cd ~ || exit
@@ -30,6 +37,5 @@ fi
 #sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunner -t ubuntu-gamerunner
 #sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 
-# todo: do the swarm manager creation and setting up service and whatever
-
+sudo docker swarm join --token "$WORKER_JOIN_TOKEN" "$MANAGER_IP"
 echo "All done."
