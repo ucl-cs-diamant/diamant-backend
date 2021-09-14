@@ -117,37 +117,45 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
+def create_or_update_user_code_instance(user_instance: User, repo: Repo, repo_name: str, clone_working_dir):
+    repo_default_branch = repo.active_branch.name
+    repo_branches = {line.strip().split('origin/')[-1] for line in repo.git.branch('-r').splitlines()}
+
+    for repo_branch_name in repo_branches:
+        code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
+
+        if created and repo_default_branch == repo_branch_name:
+            code_instance.to_clone = True
+
+        # noinspection PyUnresolvedReferences
+        if code_instance.commit_sha != (branch_head_sha := repo.branches['repo_branch'].commit.hexsha) or created:
+            repo.git.checkout(repo_branch_name)
+            branch_head_commit_time = repo.active_branch.commit.committed_datetime
+            with tempfile.TemporaryFile() as temp_file:
+                with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
+                    for dir_entry in os.listdir(clone_working_dir):
+                        # arcname removes temp_dir prefix from tar
+                        tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
+
+                code_instance_filename = f"{repo_name}-{repo_branch_name}-{repo.head.reference.commit.hexsha}.tar"
+                code_instance.source_code.save(code_instance_filename, File(temp_file))
+
+            code_instance.commit_sha = branch_head_sha
+            code_instance.commit_time = branch_head_commit_time
+            code_instance.has_failed = False
+            code_instance.save()
+
+
 @shared_task
 def clone_repositories():
-    # github_api_token = os.environ.get('GITHUB_API_TOKEN', None)
-    # if github_api_token is None:
-    #     raise ValueError("No Github API token provided.")
-    # todo: change org and prefix, move to environment file/environment variables
-    # prefix = "test-sample-code-"
-    # repos = list_classroom_repos(github_api_token, "ucl-cs-diamant", prefix)
+    # todo: move prefix to config/env file
     prefix = "test-sample-code-"
     repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
     for repo in repos:
         username = repo["name"][len(prefix):]
         if User.objects.filter(github_username=username).exists():
             user_instance = User.objects.get(github_username=username)
-            # if user exists, clone repo and tar directory (otherwise wait until their user instance is created)
+            # if user exists, clone repo and tar directory
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
-                latest_main_commit_datetime = repo_instance.head.reference.commit.committed_datetime
-
-                code_inst, created = UserCode.objects.get_or_create(user=user_instance,
-                                                                    commit_time=latest_main_commit_datetime)
-                if created:
-                    with tempfile.TemporaryFile() as temp_file:
-                        with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
-                            for dir_entry in os.listdir(temp_dir):
-                                # arcname removes temp_dir prefix from tar
-                                tar_out.add(os.path.join(temp_dir, dir_entry), arcname=dir_entry)
-                        code_inst.source_code.save(f"{repo['name']}-{repo_instance.head.reference.commit.hexsha}.tar",
-                                                   File(temp_file))
-                    if UserCode.objects.filter(user=user_instance, is_latest=True).count() > 1:
-                        last_latest = UserCode.objects.filter(user=user_instance, is_latest=True)[1:]
-                        for elem in last_latest:    # should never be more than one, but this should self-correct if it
-                            elem.is_latest = False  # does happen
-                            elem.save()
+                create_or_update_user_code_instance(user_instance, repo_instance, repo['name'], temp_dir)

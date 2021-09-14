@@ -31,9 +31,13 @@ class User(models.Model):
 class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     source_code = models.FileField(upload_to=get_filename)
-    commit_time = models.DateTimeField(unique=True)
+    branch = models.CharField(max_length=255)
+    to_clone = models.BooleanField(default=False)  # tells us if we want to clone and run this branch
+
+    commit_time = models.DateTimeField()
+    commit_sha = models.CharField(max_length=41)
+
     has_failed = models.BooleanField(default=False)
-    is_latest = models.BooleanField(default=True)
     is_in_game = models.BooleanField(default=False)
 
 
