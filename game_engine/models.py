@@ -32,7 +32,9 @@ class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     source_code = models.FileField(upload_to=get_filename)
     branch = models.CharField(max_length=255)
+
     to_clone = models.BooleanField(default=False)  # tells us if we want to clone and run this branch
+    primary = models.BooleanField(default=False)  # should this branch appear on actual leaderboards
 
     commit_time = models.DateTimeField()
     commit_sha = models.CharField(max_length=41)
@@ -42,7 +44,8 @@ class UserCode(models.Model):
 
 
 class UserPerformance(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    code = models.OneToOneField(UserCode, on_delete=models.CASCADE)
     mmr = models.DecimalField(max_digits=12, decimal_places=6, default=25.00)
     confidence = models.DecimalField(max_digits=12, decimal_places=7, default=8.33333)
     games_played = models.IntegerField(default=0)

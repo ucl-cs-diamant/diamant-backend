@@ -126,6 +126,7 @@ def create_or_update_user_code_instance(user_instance: User, repo: Repo, repo_na
 
         if created and repo_default_branch == repo_branch_name:
             code_instance.to_clone = True
+            code_instance.primary = True
 
         # noinspection PyUnresolvedReferences
         if code_instance.commit_sha != (branch_head_sha := repo.branches['repo_branch'].commit.hexsha) or created:
