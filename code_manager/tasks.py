@@ -68,14 +68,14 @@ def check_identity(file_path):
         return None
 
 
-def create_user(student_id, student_email, github_username):
+def create_user(student_id, email_address, github_username):
     # get_or_create should be redundant, but it never hurts to be cautious?
-    student_object, created = User.objects.get_or_create(email_address=student_email,
+    student_object, created = User.objects.get_or_create(email_address=email_address,
                                                          student_id=student_id,
                                                          github_username=github_username)
     if not created:
         student_object.student_id = student_id
-        student_object.student_email = student_email
+        student_object.student_email = email_address
         student_object.github_username = github_username
         student_object.save()
 

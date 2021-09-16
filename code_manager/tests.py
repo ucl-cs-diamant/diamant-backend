@@ -1,4 +1,7 @@
 from unittest.mock import patch, mock_open
+
+import code_manager.tasks
+from game_engine.models import User
 from .tasks import check_identity
 
 from django.test import TestCase
@@ -39,3 +42,10 @@ class CodeManagerTest(TestCase):
                    mock_open(read_data='Email address: someone@example.com\nStudent number: 18012345')):
             res = check_identity("foo")
             self.assertEqual((18012345, 'someone@example.com'), res)
+
+    def test_create_user(self):
+        user_details = {"student_id": 12345678,
+                        "email_address": "email@example.com",
+                        "github_username": "GitHubUsername"}
+        code_manager.tasks.create_user(**user_details)
+        self.assertEqual(User.objects.filter(**user_details).count(), 1)
