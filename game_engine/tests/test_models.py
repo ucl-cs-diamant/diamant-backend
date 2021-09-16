@@ -1,4 +1,6 @@
 from django.test import TestCase
+from django.utils import timezone
+
 import game_engine.models as models
 
 
@@ -22,7 +24,8 @@ class UserPerformanceTestCase(TestCase):
         self.user = models.User.objects.create(student_id=28588828,
                                                email_address="hello@ucl.ac.uk",
                                                github_username="hello")
-        self.up_instance = models.UserPerformance.objects.create(user=self.user)
+        self.uc_instance = models.UserCode.objects.create(user=self.user, commit_time=timezone.now())
+        self.up_instance = models.UserPerformance.objects.create(user=self.user, code=self.uc_instance)
 
     def test_up_defaults(self):
         self.assertEqual(self.up_instance.mmr, 25.00)

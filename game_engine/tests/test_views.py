@@ -9,6 +9,8 @@ import game_engine.models as models
 from decimal import Decimal
 from collections import OrderedDict
 
+from game_engine.serializers import UserPerformanceSerializer
+
 
 def create_user(user_id):
     user = models.User.objects.create(student_id=user_id,
@@ -16,6 +18,12 @@ def create_user(user_id):
                                       github_username="{name}".format(name=user_id))
     user.save()
     return user
+
+
+def create_user_code(user_instance, is_primary=True):
+    user_code = models.UserCode.objects.create(user=user_instance, commit_time=timezone.now(), primary=is_primary)
+    user_code.save()
+    return user_code
 
 
 def create_match_result_entry(user):
@@ -41,16 +49,24 @@ class TestViews(TestCase):
 
     def test_performance_list(self):
         user = create_user(1)
+        user_code = create_user_code(user)
 
         user_performance = models.UserPerformance.objects.create(user=user,
                                                                  mmr=25.00,
-                                                                 confidence=8.33333)
+                                                                 confidence=8.33333,
+                                                                 code=user_code)
         user_performance.save()
-        expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/', 'user_name': '1',
-                    'mmr': 25.000000, 'pk': user_performance.pk, 'confidence': 8.3333300, 'games_played': 0,
-                    'league': 0, 'user': f'http://testserver/users/{user.pk}/'}
+        expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/',
+                    'user_name': '1',
+                    'mmr': 25.000000,
+                    'pk': user_performance.pk,
+                    'confidence': 8.3333300,
+                    'games_played': 0,
+                    'league': 0,
+                    'user': f'http://testserver/users/{user.pk}/'}
 
         response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0], expected)
 
     def test_user_match_list_empty(self):
@@ -101,20 +117,25 @@ class TestViews(TestCase):
         view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
 
         user = create_user(1)
+        user_code = create_user_code(user)
         user_performance = models.UserPerformance.objects.create(user=user,
                                                                  mmr=25.00,
-                                                                 confidence=8.33333)
+                                                                 confidence=8.33333,
+                                                                 code=user_code)
         user_performance.save()
 
         user2 = create_user(2)
+        user_code2 = create_user_code(user2)
         user_performance2 = models.UserPerformance.objects.create(user=user2,
                                                                   mmr=27.00,
-                                                                  confidence=8.33333)
+                                                                  confidence=8.33333,
+                                                                  code=user_code2)
         user_performance2.save()
 
         request = factory.get('/', {'sort': 'mmr', 'order': 'desc'})
         response = view(request)
 
+        key_order = UserPerformanceSerializer.Meta.fields
         expected = [OrderedDict(
             [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
              ('pk', user_performance2.pk),
@@ -124,6 +145,7 @@ class TestViews(TestCase):
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
              ('league', 0), ('user', f'http://testserver/users/{user.pk}/')])]
+        expected = [{key: od[key] for key in key_order} for od in expected]
 
         self.assertSequenceEqual(expected, response.data)
 
@@ -132,29 +154,47 @@ class TestViews(TestCase):
         view = views.UserPerformanceViewSet.as_view({'get': 'list'}, pagination_class=None)
 
         user = create_user(1)
+        user_code = create_user_code(user)
         user_performance = models.UserPerformance.objects.create(user=user,
                                                                  mmr=25.00,
-                                                                 confidence=8.33333)
+                                                                 confidence=8.33333,
+                                                                 code=user_code)
         user_performance.save()
 
         user2 = create_user(2)
+        user_code2 = create_user_code(user2)
         user_performance2 = models.UserPerformance.objects.create(user=user2,
                                                                   mmr=27.00,
-                                                                  confidence=8.33333)
+                                                                  confidence=8.33333,
+                                                                  code=user_code2)
         user_performance2.save()
 
         request = factory.get('/', {'sort': 'mmr', 'order': 'asc'})
         response = view(request)
 
-        expected = [OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
-             ('pk', user_performance.pk),
-             ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')),
-             ('games_played', 0), ('league', 0), ('user', f'http://testserver/users/{user.pk}/')]), OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
-             ('pk', user_performance2.pk),
-             ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
-             ('league', 0), ('user', f'http://testserver/users/{user2.pk}/')])]
+        # expected order:
+        key_order = UserPerformanceSerializer.Meta.fields
+        expected = [
+            OrderedDict(
+                [('url', f'http://testserver/user_performances/{user_performance.pk}/'),
+                 ('user_name', '1'),
+                 ('pk', user_performance.pk),
+                 ('mmr', Decimal('25.000000')),
+                 ('confidence', Decimal('8.3333300')),
+                 ('games_played', 0),
+                 ('league', 0),
+                 ('user', f'http://testserver/users/{user.pk}/')]),
+            OrderedDict(
+                [('url', f'http://testserver/user_performances/{user_performance2.pk}/'),
+                 ('user_name', '2'),
+                 ('pk', user_performance2.pk),
+                 ('mmr', Decimal('27.000000')),
+                 ('confidence', Decimal('8.3333300')),
+                 ('games_played', 0),
+                 ('league', 0),
+                 ('user', f'http://testserver/users/{user2.pk}/')])
+        ]
+        expected = [{key: od[key] for key in key_order} for od in expected]
 
         self.assertEqual(expected, response.data)
 
