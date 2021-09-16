@@ -90,8 +90,7 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
         matches_created = 0
         while matches_created < matches_to_create:
             available_players = UserCode.objects. \
-                filter(has_failed=False, is_latest=True, is_in_game=False).select_related('user').only('user',
-                                                                                                       'is_in_game')
+                filter(has_failed=False, is_in_game=False).select_related('user').only('user')
             if available_players.count() < min_game_size:
                 return
 

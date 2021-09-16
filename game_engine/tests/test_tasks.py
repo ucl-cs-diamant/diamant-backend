@@ -18,24 +18,27 @@ class TestTasks(TestCase):
         self.mock_file = mock.MagicMock(spec=File)
         self.mock_file.name = "testing.py"
         for i in range(4):
-            user = models.User.objects.create(student_id=i,
-                                              email_address="{name}@ucl.ac.uk".format(name=i),
-                                              github_username="{name}".format(name=i))
+            user = models.User.objects.create(
+                student_id=i,
+                email_address="{name}@ucl.ac.uk".format(name=i),
+                github_username="{name}".format(name=i)
+            )
+            user_code = models.UserCode.objects.create(
+                user=user,
+                source_code=self.mock_file.name,
+                commit_time=timezone.now()
+            )
+            user_performance = models.UserPerformance.objects.create(
+                user=user,
+                mmr=25.00 * i,
+                confidence=8.33333 - i,
+                league=8,
+                code=user_code
+            )
+
             self.user_list.append(user)
-            user.save()
-
-            user_code = models.UserCode.objects.create(user=user,
-                                                       source_code=self.mock_file.name,
-                                                       commit_time=timezone.now())
             self.user_code_list.append(user_code)
-            user_code.save()
-
-            user_performance = models.UserPerformance.objects.create(user=user,
-                                                                     mmr=25.00 * i,
-                                                                     confidence=8.33333 - i,
-                                                                     league=8)
             self.user_performance_list.append(user_performance)
-            user_performance.save()
 
         # dummy timeout value since messing around with environment variables is a pain potentially
         self.timeout = float(60)
@@ -45,8 +48,8 @@ class TestTasks(TestCase):
         match = models.Match.objects.all().first()
         self.assertEqual(len(match.players), 4)
 
-        players_ingame = models.UserCode.objects.filter(is_in_game=True)
-        self.assertEqual(len(players_ingame), 4)
+        players_in_game_count = models.UserCode.objects.filter(is_in_game=True).count()
+        self.assertEqual(players_in_game_count, 4)
 
     def test_match_making_min_players(self):
         models.UserCode.objects.all().first().delete()
@@ -146,7 +149,7 @@ class TestTasks(TestCase):
         self.assertEqual(0.04000000512000041, five_players)
 
     def test_determine_acceptable_match_perfect_quality(self):
-        quality = 0.08944272768649317   # optimal quality for four players
+        quality = 0.08944272768649317  # optimal quality for four players
         self.assertTrue(tasks.determine_acceptable_match(quality, 4, 0))
 
     def test_determine_acceptable_match_bad_quality(self):

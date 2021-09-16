@@ -67,7 +67,7 @@ class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UserPerformance
-        fields = '__all__'
+        fields = ['pk', 'url', 'user_name', 'mmr', 'confidence', 'games_played', 'league', 'user']
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):

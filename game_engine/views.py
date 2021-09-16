@@ -42,7 +42,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True)
     def performance_list(self, request, pk=None):
-        objects = UserPerformance.objects.filter(user_id=pk)
+        objects = UserPerformance.objects.filter(user_id=pk, code__primary=True)
         if objects.count() == 0:
             return Response(None, status=status.HTTP_204_NO_CONTENT)
         serializer = UserPerformanceSerializer(objects, many=True, context={'request': request})
