@@ -117,7 +117,7 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
-def create_or_update_user_code_instance(user_instance: User, repo: Repo, repo_name: str, clone_working_dir):
+def create_or_update_user_code_instance(user_instance: User, repo: Repo, clone_working_dir):
     repo_default_branch = repo.active_branch.name
     repo_branches = {line.strip().split('origin/')[-1] for line in repo.git.branch('-r').splitlines()}
 
@@ -129,12 +129,14 @@ def create_or_update_user_code_instance(user_instance: User, repo: Repo, repo_na
             code_instance.primary = True
 
         # noinspection PyUnresolvedReferences
-        if code_instance.commit_sha != (branch_head_sha := repo.branches['repo_branch'].commit.hexsha) or created:
-            save_code_archive(branch_head_sha, clone_working_dir, code_instance, repo, repo_branch_name, repo_name)
+        if code_instance.commit_sha != repo.branches[repo_branch_name].commit.hexsha or created:
+            save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name)
 
 
-def save_code_archive(branch_head_sha, clone_working_dir, code_instance, repo, repo_branch_name, repo_name):
+def save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name):
     repo.git.checkout(repo_branch_name)
+    branch_head_sha = repo.branches[repo_branch_name].commit.hexsha
+    repo_name = repo.remotes.origin.url.split('.git')[0].split('/')[-1]
     branch_head_commit_time = repo.active_branch.commit.committed_datetime
     with tempfile.TemporaryFile() as temp_file:
         with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
@@ -162,4 +164,4 @@ def clone_repositories():
             # if user exists, clone repo and tar directory
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
-                create_or_update_user_code_instance(user_instance, repo_instance, repo['name'], temp_dir)
+                create_or_update_user_code_instance(user_instance, repo_instance, temp_dir)
