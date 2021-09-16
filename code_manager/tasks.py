@@ -130,21 +130,24 @@ def create_or_update_user_code_instance(user_instance: User, repo: Repo, repo_na
 
         # noinspection PyUnresolvedReferences
         if code_instance.commit_sha != (branch_head_sha := repo.branches['repo_branch'].commit.hexsha) or created:
-            repo.git.checkout(repo_branch_name)
-            branch_head_commit_time = repo.active_branch.commit.committed_datetime
-            with tempfile.TemporaryFile() as temp_file:
-                with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
-                    for dir_entry in os.listdir(clone_working_dir):
-                        # arcname removes temp_dir prefix from tar
-                        tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
+            save_code_archive(branch_head_sha, clone_working_dir, code_instance, repo, repo_branch_name, repo_name)
 
-                code_instance_filename = f"{repo_name}-{repo_branch_name}-{repo.head.reference.commit.hexsha}.tar"
-                code_instance.source_code.save(code_instance_filename, File(temp_file))
 
-            code_instance.commit_sha = branch_head_sha
-            code_instance.commit_time = branch_head_commit_time
-            code_instance.has_failed = False
-            code_instance.save()
+def save_code_archive(branch_head_sha, clone_working_dir, code_instance, repo, repo_branch_name, repo_name):
+    repo.git.checkout(repo_branch_name)
+    branch_head_commit_time = repo.active_branch.commit.committed_datetime
+    with tempfile.TemporaryFile() as temp_file:
+        with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
+            for dir_entry in os.listdir(clone_working_dir):
+                # arcname removes temp_dir prefix from tar
+                tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
+
+        code_instance_filename = f"{repo_name}-{repo_branch_name}-{repo.head.reference.commit.hexsha}.tar"
+        code_instance.source_code.save(code_instance_filename, File(temp_file))
+    code_instance.commit_sha = branch_head_sha
+    code_instance.commit_time = branch_head_commit_time
+    code_instance.has_failed = False
+    code_instance.save()
 
 
 @shared_task
