@@ -66,13 +66,11 @@ if [[ $(sudo docker ps -a -q) ]]; then
   sudo docker rm "$(sudo docker ps -a -q)";
 fi
 sudo docker run --restart always -d -p 5672:5672 rabbitmq
-sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunner -t ubuntu-gamerunner
-sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 
 # todo: read and echo worker join key
 sudo docker swarm init --advertise-addr "$orchestrator_ip" --default-addr-pool 10.4.0.0/16
-
 sudo docker node update --label-add registry=true "$(sudo docker node ls --filter "role=manager" --format '{{.ID}}')"
+
 sudo docker service create \
   --name registry \
   --constraint 'node.labels.registry==true' \
@@ -82,11 +80,14 @@ sudo docker service create \
   --replicas 1 \
   registry:2
 
+# deprecated with
+# sudo docker build https://github.com/ucl-cs-diamant/docker.git#:ubuntu-gamerunner -t ubuntu-gamerunner
 
+sudo docker build https://github.com/ucl-cs-diamant/docker.git -t gamerunner
 sudo docker tag gamerunner localhost:5000/gamerunner
 sudo docker push localhost:5000/gamerunner
 
-sudo docker service create -e GAMESERVER_HOST="$orchestrator_ip" -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner --detach
+sudo docker service create --detach -e GAMESERVER_HOST="$orchestrator_ip" -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner
 
 continue_running="placeholder"
 while true
