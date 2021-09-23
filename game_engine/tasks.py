@@ -16,27 +16,27 @@ from .utils import Leagues
 
 
 # given a list of players, an index, and number to extract, produce a sublist of the players to participate
-def extract_players(player_list, player_index, target_length):
-    if player_index >= player_list.count():
+def extract_players(player_perf_list, player_index, target_length):
+    if player_index >= player_perf_list.count():
         return None
-    if target_length > player_list.count():
+    if target_length > player_perf_list.count():
         return None  # return None if the list given is invalid
 
-    sublist = [player_list[player_index].user.pk]
+    sublist = [player_perf_list[player_index].code.pk]
     offset = 0
 
     while len(sublist) < target_length:
         offset += 1
         if (player_index - offset) >= 0:  # not out of bounds
-            sublist.insert(0, player_list[player_index - offset].user.pk)
+            sublist.insert(0, player_perf_list[player_index - offset].code.pk)
 
-        if (player_index + offset) < player_list.count() and len(sublist) < target_length:
-            sublist.append(player_list[player_index + offset].user.pk)
+        if (player_index + offset) < player_perf_list.count() and len(sublist) < target_length:
+            sublist.append(player_perf_list[player_index + offset].code.pk)
     return sublist
 
 
 def evaluate_quality(user_performances, player_list):
-    chosen_users = user_performances.filter(user__in=player_list)
+    chosen_users = user_performances.filter(code__in=player_list)
     env = trueskill.TrueSkill()
     rating_list = []
 
@@ -47,14 +47,15 @@ def evaluate_quality(user_performances, player_list):
     return env.quality(rating_list)
 
 
-def find_players(user_codes, target_size):
-    user_performances = UserPerformance.objects.filter(user__in=user_codes.values_list('user')).order_by('mmr')
+def find_player_codes(user_codes, target_size):
+    # user_performances = UserPerformance.objects.filter(user__in=user_codes.values_list('user')).order_by('mmr')
+    user_performances = UserPerformance.objects.filter(code__in=user_codes).order_by('mmr')
     random_index = random.randrange(0, user_performances.count())
 
+    # players refers to UserCode instance
     chosen_players = extract_players(user_performances, random_index, target_size)
     match_quality = evaluate_quality(user_performances, chosen_players)
 
-    # todo: implement method of retrying if match quality is below a standard/cost function
     return chosen_players, match_quality
 
 
@@ -89,8 +90,7 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
         matches_to_create = min_games_in_queue - current_ready_match_count
         matches_created = 0
         while matches_created < matches_to_create:
-            available_players = UserCode.objects. \
-                filter(has_failed=False, is_in_game=False).select_related('user').only('user')
+            available_players = UserCode.objects.filter(has_failed=False, is_in_game=False)
             if available_players.count() < min_game_size:
                 return
 
@@ -98,17 +98,17 @@ def matchmake(min_game_size: int = 3, target_game_size: int = 4, min_games_in_qu
                 target_game_size = available_players.count()
 
             # find initial batch of players, if not acceptable, keep finding more
-            players, quality = find_players(available_players, target_game_size)
+            player_codes, quality = find_player_codes(available_players, target_game_size)
             rejects = 0
-            while not determine_acceptable_match(quality, len(players), rejects):
-                players, quality = find_players(available_players, target_game_size)
+            while not determine_acceptable_match(quality, len(player_codes), rejects):
+                player_codes, quality = find_player_codes(available_players, target_game_size)
                 rejects += 1
 
             match = Match()
-            match.players = players
+            match.players = player_codes
             match.save()
 
-            UserCode.objects.filter(user__in=players).update(is_in_game=True)
+            UserCode.objects.filter(pk__in=player_codes).update(is_in_game=True)
             matches_created += 1
             print(f"Created match {match.pk} with players {match.players}")
 
@@ -125,8 +125,8 @@ def scrub_dead_matches():
     for match in in_progress_matches:
         if (timezone.now() - match.allocated).total_seconds() >= timeout:
             print(f"Match {match.pk} dead, removing.")
-            players = match.players
-            UserCode.objects.filter(user__in=players).update(is_in_game=False)
+            user_codes = match.players
+            UserCode.objects.filter(pk__in=user_codes).update(is_in_game=False)
             match.delete()
 
 
