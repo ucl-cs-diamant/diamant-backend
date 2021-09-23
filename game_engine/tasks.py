@@ -1,14 +1,11 @@
 import os
 
 import random
-import tarfile
-import tempfile
 import time
 
 import trueskill
 from celery import shared_task
 from django.db.models import QuerySet
-from django.core.files import File
 
 from game_engine.models import User, UserCode, Match, UserPerformance
 from django.utils import timezone
@@ -17,7 +14,6 @@ import numpy as np
 import csv
 
 from .utils import Leagues
-from code_manager import tasks
 
 
 # given a list of players, an index, and number to extract, produce a sublist of the players to participate
@@ -196,10 +192,8 @@ def create_student_records():
     for student_filename in os.listdir(student_dir):
         if student_filename.endswith(".csv"):
             csv_reader = csv.DictReader(open(os.path.join(student_dir, student_filename), mode='r'))
-            line_count = 0
 
             for row in csv_reader:
-
                 if not User.objects.filter(student_id=row["Student ID"]).exists():
                     # make a user from the student data
                     user = User.objects.create(student_id=row["Student ID"],
@@ -210,33 +204,3 @@ def create_student_records():
                                                github_username=None)
 
                     user.save()
-
-                    with tempfile.TemporaryDirectory() as temp_dir:
-                        prefix = "bot-template"
-                        repos = tasks.list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
-
-                        repo_instance = tasks.clone_repo(repos[0]["clone_url"], temp_dir)
-                        latest_main_commit_datetime = repo_instance.head.reference.commit.committed_datetime
-
-                        code_inst, created = UserCode.objects.get_or_create(user=user,
-                                                                            commit_time=latest_main_commit_datetime)
-                        if created:
-                            with tempfile.TemporaryFile() as temp_file:
-                                with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
-                                    for dir_entry in os.listdir(temp_dir):
-                                        # arcname removes temp_dir prefix from tar
-                                        tar_out.add(os.path.join(temp_dir, dir_entry), arcname=dir_entry)
-                                code_inst.source_code.save(
-                                    f"{repos[0]['name']}-{repo_instance.head.reference.commit.hexsha}.tar",
-                                    File(temp_file))
-                            if UserCode.objects.filter(user=user, is_latest=True).count() > 1:
-                                last_latest = UserCode.objects.filter(user=user, is_latest=True)[1:]
-                                for elem in last_latest:  # should never be more than one, but this should self-correct if it
-                                    elem.is_latest = False  # does happen
-                                    elem.save()
-
-
-                    user_performance = UserPerformance.objects.create(user=user)
-                    user_performance.save()
-
-        # todo: wait for new version of repo copying code

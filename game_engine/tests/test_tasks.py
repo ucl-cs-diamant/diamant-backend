@@ -163,3 +163,10 @@ class TestTasks(TestCase):
     def test_determine_acceptable_match_rejects(self):
         quality = 0.08
         self.assertTrue(tasks.determine_acceptable_match(quality, 4, 5))
+
+    def test_create_student_records(self):
+        with mock.patch('builtins.open', mock.mock_open(read_data='Student ID,Known As Name,Surname,Programme,Year of '
+                                                                  'Study\n''10,foo,bar,program1,1\n''20,foo2,bar2,'
+                                                                  'program2,2')):
+            tasks.create_student_records()
+            self.assertEqual(models.User.objects.all().last().student_id, 20)
