@@ -1,4 +1,6 @@
 import os
+import pathlib
+import tempfile
 from datetime import timedelta
 
 from django.utils import timezone
@@ -163,3 +165,27 @@ class TestTasks(TestCase):
     def test_determine_acceptable_match_rejects(self):
         quality = 0.08
         self.assertTrue(tasks.determine_acceptable_match(quality, 4, 5))
+
+    def test_create_student_records_with_env(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        open(pathlib.Path(temp_dir.name).joinpath('sample_file.csv'), 'a').close()
+
+        csv_data = """Student ID,Known As Name,Surname,Programme,Year of Study
+        10,foo,bar,program1,1
+        20,foo2,bar2,program2,2"""
+
+        with mock.patch('builtins.open', mock.mock_open(read_data=csv_data)), \
+                mock.patch.dict(os.environ, {"STUDENT_FILE_DIR": temp_dir.name}, clear=True):
+            tasks.create_student_records()
+            self.assertEqual(models.User.objects.all().last().student_id, 20)
+
+    def test_create_student_records_no_env(self):
+        csv_data = """Student ID,Known As Name,Surname,Programme,Year of Study
+        10,foo,bar,program1,1
+        20,foo2,bar2,program2,2"""
+
+        with mock.patch('builtins.open', mock.mock_open(read_data=csv_data)), mock.patch('os.listdir') as listdir_mock:
+            listdir_mock.return_value = ['sample_file.csv']
+
+            tasks.create_student_records()
+            self.assertEqual(models.User.objects.all().last().student_id, 20)

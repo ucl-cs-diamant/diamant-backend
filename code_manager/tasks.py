@@ -252,3 +252,10 @@ def clone_repositories():
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
                 create_or_update_branches(user_instance, repo_instance, temp_dir)
+
+
+@shared_task
+def create_usercode_instance():
+    bare_users = User.objects.filter(usercode=None)
+    for user in bare_users:
+        clone_from_template(user)

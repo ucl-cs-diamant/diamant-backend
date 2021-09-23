@@ -14,6 +14,8 @@ from game_engine.serializers import UserPerformanceSerializer
 
 def create_user(user_id):
     user = models.User.objects.create(student_id=user_id,
+                                      programme="Bsc Computer Science",
+                                      year=1,
                                       email_address="{name}@ucl.ac.uk".format(name=user_id),
                                       github_username="{name}".format(name=user_id))
     user.save()

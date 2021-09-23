@@ -7,10 +7,11 @@ import trueskill
 from celery import shared_task
 from django.db.models import QuerySet
 
-from game_engine.models import UserCode, Match, UserPerformance
+from game_engine.models import User, UserCode, Match, UserPerformance
 from django.utils import timezone
 from django_celery_beat.models import PeriodicTask
 import numpy as np
+import csv
 
 from .utils import Leagues
 
@@ -182,3 +183,28 @@ def recalculate_leagues(percentiles=(25, 50, 75)):
     if matchmaking_task is not None:
         matchmaking_task.enabled = True
         matchmaking_task.save()
+
+
+def create_student_records_from_file(file_path: str):
+    with open(file_path, mode='r') as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            if User.objects.filter(student_id=row["Student ID"]).exists():
+                continue
+            # make a user from the student data
+            User.objects.create(student_id=row["Student ID"],
+                                name=(row["Known As Name"] + " " + row["Surname"]),
+                                programme=row["Programme"],
+                                year=row["Year of Study"],
+                                email_address=None,
+                                github_username=None)
+
+
+@shared_task
+def create_student_records():
+    student_dir = os.environ.get("STUDENT_FILE_DIR",
+                                 os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))))
+
+    for student_filename in os.listdir(student_dir):
+        if student_filename.endswith(".csv"):
+            create_student_records_from_file(os.path.join(student_dir, student_filename))

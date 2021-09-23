@@ -22,8 +22,11 @@ def get_filename(instance, filename):
 # Create your models here.
 class User(models.Model):
     student_id = models.IntegerField(unique=True)
-    email_address = models.CharField(max_length=127, unique=True)
-    github_username = models.CharField(max_length=40, unique=True)
+    name = models.CharField(default="", max_length=127)
+    programme = models.CharField(default="", max_length=127)
+    year = models.IntegerField(default=0)
+    email_address = models.CharField(max_length=127, unique=True, null=True)
+    github_username = models.CharField(max_length=40, unique=True, null=True)
     authentication_token = models.CharField(max_length=36, unique=True,
                                             editable=False, default=hex_token)
 
