@@ -70,9 +70,70 @@ class MatchViewSet(viewsets.ModelViewSet):
     serializer_class = MatchSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @staticmethod
+    def handle_ok_match(request, match):
+        if not isinstance(request.data.get("winners", None), list):
+            return Response({"ok": False, "message": "No winners provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        match_players = match.players
+        winners = request.data["winners"]
+
+        if not set(winners).issubset(set(match_players)):
+            return Response({"ok": False, "message": "One or more winner not part of match"},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(request.data.get("match_history", None), list):
+            return Response({"ok": False, "message": "Missing match history"}, status=status.HTTP_400_BAD_REQUEST)
+
+        match_result = MatchResult()
+        match_result.time_started = match.allocated
+        match_result.players = match.players
+        match_result.winners = request.data["winners"]
+        match_result.match_events = request.data["match_history"]
+        match_result.save()
+
+        match.delete()
+
+        ranks, rating_group = MatchViewSet.prep_for_rating(match_players, winners)
+
+        new_ratings = rate(rating_group, ranks)  # generate new MMRs based on TrueSkill
+
+        for player in match_players:  # update every player with their new MMRs
+            up_instance = UserPerformance.objects.get(code__pk=player)
+            player_rating = new_ratings.pop(0)[0]  # needs two layers to index -> team -> player
+            up_instance.mmr = player_rating.mu
+            up_instance.confidence = player_rating.sigma
+            up_instance.save()
+
+        UserCode.objects.filter(pk__in=match_players).update(is_in_game=False)
+        return Response(status=status.HTTP_201_CREATED)
+
+    @staticmethod
+    def prep_for_rating(match_players, winners):
+        rating_group = []  # list of player ratings and their win/loss pos
+        ranks = []
+        for player in match_players:
+            player_code_instance = UserCode.objects.get(pk=player)
+            up_instance, _ = UserPerformance.objects.get_or_create(code=player_code_instance,
+                                                                   user=player_code_instance.user)
+            up_instance.games_played += 1
+            up_instance.save()
+
+            # pull player elo and confidence amounts
+            player_elo = up_instance.mmr
+            player_confidence = up_instance.confidence
+
+            rating = Rating(float(player_elo), float(player_confidence))
+            rating_group.append([rating])
+            if player in winners:  # 0 is a winning player
+                ranks.append(0)
+            else:
+                ranks.append(1)
+        return ranks, rating_group
+
     # noinspection PyUnusedLocal,PyShadowingBuiltins
     @action(methods=["POST"], detail=True, permission_classes=[])
-    def report_match(self, request, pk=None, format=None):  # todo: turn into serializer
+    def report_match(self, request, pk=None, format=None):
         try:
             match = Match.objects.get(pk=pk)
         except Match.DoesNotExist:
@@ -81,66 +142,7 @@ class MatchViewSet(viewsets.ModelViewSet):
         if "outcome" not in request.data:
             return Response({"ok": False, "message": "No outcome specified"}, status=status.HTTP_400_BAD_REQUEST)
         if request.data["outcome"] == "ok":
-            if not isinstance(request.data.get("winners", None), list):
-                return Response({"ok": False, "message": "No winners provided"},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-            match_players = match.players
-            winners = request.data["winners"]
-
-            if not set(winners).issubset(set(match_players)):
-                return Response({"ok": False, "message": "One or more winner not part of match"},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-            if not isinstance(request.data.get("match_history", None), list):
-                return Response({"ok": False, "message": "Missing match history"},
-                                status=status.HTTP_400_BAD_REQUEST)
-
-            match_result = MatchResult()
-            match_result.time_started = match.allocated
-            match_result.players = Match.objects.get(pk=pk).players
-            match_result.winners = request.data["winners"]
-            match_result.match_events = request.data["match_history"]
-            match_result.save()
-
-            match.delete()
-
-            rating_group = []  # list of player ratings and their win/loss pos
-            ranks = []
-
-            for player in match_players:
-                player_code_instance = UserCode.objects.get(pk=player)
-                up_instance, _ = UserPerformance.objects.get_or_create(code=player_code_instance,
-                                                                       user=player_code_instance.user)
-                up_instance.games_played += 1
-                up_instance.save()
-
-                # pull player elo and confidence amounts
-                player_elo = up_instance.mmr
-                player_confidence = up_instance.confidence
-
-                rating = Rating(float(player_elo), float(player_confidence))
-                rating_group.append([rating])
-                if player in winners:  # 0 is a winning player
-                    ranks.append(0)
-                else:
-                    ranks.append(1)
-
-            new_ratings = rate(rating_group, ranks)  # generate new elos based on trueskill
-
-            for player in match_players:  # update every player with their new elos
-                up_instance = UserPerformance.objects.get(code__pk=player)
-                player_rating = new_ratings.pop(0)[0]  # needs two layers to index -> team -> player
-                up_instance.mmr = player_rating.mu
-                up_instance.confidence = player_rating.sigma
-                up_instance.save()
-
-            # UserPerformance.objects.filter(user__pk__in=match_players).update(games_played=F('games_played')+1)
-            # UserPerformance.objects.filter(user__pk__in=winners).update(mmr=F('mmr') + 100)
-            # UserPerformance.objects.filter(user__pk__in=losers).update(mmr=F('mmr') - 100)
-
-            UserCode.objects.filter(pk__in=match_players).update(is_in_game=False)
-            return Response(status=status.HTTP_201_CREATED)
+            return self.handle_ok_match(request=request, match=match)
         if request.data["outcome"] == "fail":
             if not isinstance(request.data.get("causes", None), list):
                 return Response({"ok": False, "message": "Missing failure causes"})
