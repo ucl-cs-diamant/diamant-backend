@@ -96,6 +96,7 @@ def clone_repo(repo_url: str, destination: str) -> Repo:
         # repo["clone_url"].split("github.com/")
         repo_url.split("github.com/")
     )
+    print(f"cloning repo {repo_url} for real")
     repo = Repo.clone_from(auth_url_string, destination)
     return repo
 
@@ -163,7 +164,7 @@ def get_template(update=False,
     :param cache_key: Key to use for template cache
     :return: (TemporaryDirectory instance, Repo instance). tempdir instance is needed to keep it in scope
     """
-    template_last_updated = cache.get(update_time_key, default=datetime.utcfromtimestamp(0))
+    template_last_updated = cache.get(update_time_key, default=datetime.fromtimestamp(0).astimezone(timezone.utc))
     template_repository = cache.get(cache_key)
 
     if update or template_repository is None:
@@ -179,8 +180,8 @@ def get_template(update=False,
     return temp_dir, repo_instance
 
 
-def clone_from_template(user_instance: User, update=False):
-    td, template_repo = get_template(update)
+def clone_from_template(user_instance: User, update=False, **kwargs):
+    td, template_repo = get_template(update, **kwargs)
     create_or_update_user_code(branch=(template_repo.active_branch.name, template_repo.active_branch.name),
                                clone_working_dir=td.name,
                                repo=template_repo,
@@ -212,7 +213,7 @@ def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir
 
 def archive_directory(directory):
     temp_file = tempfile.TemporaryFile()
-    with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
+    with tarfile.open(fileobj=temp_file, mode="w", format=tarfile.GNU_FORMAT) as tar_out:
         for dir_entry in os.listdir(directory):
             # arcname removes temp_dir prefix from tar
             tar_out.add(os.path.join(directory, dir_entry), arcname=dir_entry)
