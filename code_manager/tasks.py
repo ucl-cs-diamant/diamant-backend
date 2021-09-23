@@ -1,8 +1,13 @@
 # import typing
+from datetime import timedelta
+
 from celery import shared_task
 # import concurrent.futures
 
 from django.core.files import File
+from django.core.cache import cache
+from django.utils import timezone
+
 from game_engine.models import User, UserCode, UserPerformance
 
 from git import Repo
@@ -121,11 +126,60 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
-def clone_from_template(user_instance: User, repo: Repo):
-    branch_name, repo_default_branch = ("master",) * 2
-    with tempfile.TemporaryDirectory() as temp_dir:
-        create_or_update_user_code(branch=(branch_name, repo_default_branch), clone_working_dir=temp_dir, repo=repo,
-                                   user_instance=user_instance)
+def get_template(update=False, cache_key='template_repository',
+                 update_time_threshold: int = 3600,
+                 update_time_key: str = 'template_repo_last_updated'):
+    """
+
+    :param update: Force updating template cache
+    :param update_time_threshold: Time to keep template in cache before updating
+    :param update_time_key: Key to use for template cache last updated time
+    :param cache_key: Key to use for template cache
+    :return: (TemporaryDirectory instance, Repo instance). tempdir instance is needed to keep it in scope
+    """
+    template_last_updated = cache.get(update_time_key)
+    template_repository = cache.get(cache_key)
+    if template_last_updated is not None and template_repository is not None:
+        temp_dir = tempfile.TemporaryDirectory()
+        with tempfile.TemporaryFile("w+b") as temp_outfile:
+            temp_outfile.write(template_repository)
+            temp_outfile.flush()
+            temp_outfile.seek(0)
+            with tarfile.open(fileobj=temp_outfile, mode='r') as template_tar:
+                template_tar.extractall(temp_dir.name)
+
+        repo_instance = Repo(temp_dir.name)
+        # print(repo_instance.active_branch.commit.committed_datetime)
+
+        # could be more efficient, but this was written at 4 in the morning
+        # print((timezone.now() - template_last_updated), timedelta(seconds=update_time_threshold))
+        if (timezone.now() - template_last_updated) <= timedelta(seconds=update_time_threshold) and not update:
+            return temp_dir, repo_instance
+        update = True
+
+    if update or template_repository is None or template_last_updated is None:
+        print(f"updating template cache, last update: {template_last_updated}")
+        template_repo_url = "https://github.com/ucl-cs-diamant/bot-template.git"
+        temp_dir = tempfile.TemporaryDirectory()
+        clone_repo(template_repo_url, temp_dir.name)
+        repo_instance = Repo(temp_dir.name)
+
+        print(repo_instance.refs)
+
+        archive = archive_directory(temp_dir.name)
+        mem_buf_archive = archive.read()
+        cache.set(cache_key, mem_buf_archive, timeout=None)
+        cache.set(update_time_key, timezone.now(), timeout=None)
+
+        return temp_dir, repo_instance
+
+
+def clone_from_template(user_instance: User):
+    td, template_repo = get_template()
+    create_or_update_user_code(branch=(template_repo.active_branch.name, template_repo.active_branch.name),
+                               clone_working_dir=td.name,
+                               repo=template_repo,
+                               user_instance=user_instance)
 
 
 # def create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance):
@@ -151,6 +205,16 @@ def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir
                                    repo=repo, user_instance=user_instance)
 
 
+def archive_directory(directory):
+    temp_file = tempfile.TemporaryFile()
+    with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
+        for dir_entry in os.listdir(directory):
+            # arcname removes temp_dir prefix from tar
+            tar_out.add(os.path.join(directory, dir_entry), arcname=dir_entry)
+    temp_file.seek(0)
+    return temp_file
+
+
 def save_code_archive(clone_working_dir, code_instance, repo, branch_name):
     if code_instance.commit_sha == repo.refs[f"origin/{branch_name}"].commit.hexsha:
         print(f"{branch_name} not changed")
@@ -165,14 +229,9 @@ def save_code_archive(clone_working_dir, code_instance, repo, branch_name):
     code_instance.commit_time = branch_head_commit_time
     code_instance.has_failed = False
 
-    with tempfile.TemporaryFile() as temp_file:
-        with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
-            for dir_entry in os.listdir(clone_working_dir):
-                # arcname removes temp_dir prefix from tar
-                tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
-
-        code_instance_filename = f"{repo_name}-{branch_name}-{repo.head.reference.commit.hexsha}.tar"
-        code_instance.source_code.save(code_instance_filename, File(temp_file))
+    temp_file = archive_directory(clone_working_dir)
+    code_instance_filename = f"{repo_name}-{branch_name}-{repo.head.reference.commit.hexsha}.tar"
+    code_instance.source_code.save(code_instance_filename, File(temp_file))
 
 
 @shared_task
