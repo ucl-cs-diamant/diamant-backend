@@ -1,8 +1,9 @@
+# import typing
 from celery import shared_task
 # import concurrent.futures
 
 from django.core.files import File
-from game_engine.models import User, UserCode
+from game_engine.models import User, UserCode, UserPerformance
 
 from git import Repo
 import os
@@ -70,14 +71,17 @@ def check_identity(file_path):
 
 def create_user(student_id, email_address, github_username):
     # get_or_create should be redundant, but it never hurts to be cautious?
-    student_object, created = User.objects.get_or_create(email_address=email_address,
-                                                         student_id=student_id,
-                                                         github_username=github_username)
-    if not created:
-        student_object.student_id = student_id
-        student_object.student_email = email_address
-        student_object.github_username = github_username
-        student_object.save()
+    # student_object, created = User.objects.get_or_create(email_address=email_address,
+    #                                                      student_id=student_id,
+    #                                                      github_username=github_username)
+    # if not created:
+    #     student_object.student_id = student_id
+    #     student_object.student_email = email_address
+    #     student_object.github_username = github_username
+    #     student_object.save()
+    User.objects.get_or_create(email_address=email_address,
+                               student_id=student_id,
+                               github_username=github_username)
 
 
 def clone_repo(repo_url: str, destination: str) -> Repo:
@@ -106,7 +110,7 @@ def fetch_user_authorization():
             # todo: ####  ADD A TOKEN CHECK, USERS WILL BE PRE-GENERATED INSTEAD OF BEING CREATED HERE ####
             for path in os.listdir(temp_dir):
                 path = os.path.join(temp_dir, path)
-                if os.path.isfile(path) and os.stat(path).st_size >= 1024:  # skip over large files
+                if not os.path.isfile(path) and os.stat(path).st_size >= 1024:  # skip over large files
                     continue
                 if (identity := check_identity(path)) is None:
                     continue
@@ -117,37 +121,54 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
-def create_or_update_user_code_instance(user_instance: User, repo: Repo, clone_working_dir):
+def clone_from_template(user_instance: User, repo: Repo):
+    branch_name, repo_default_branch = ("master",) * 2
+    with tempfile.TemporaryDirectory() as temp_dir:
+        create_or_update_user_code(branch_name=branch_name, clone_working_dir=temp_dir, repo=repo,
+                                   repo_default_branch=repo_default_branch, user_instance=user_instance)
+
+
+def create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance):
+    code_instance = UserCode.objects.filter(user=user_instance, branch=branch_name).first()
+    if code_instance is None:
+        code_instance = UserCode(user=user_instance, branch=branch_name)
+        code_instance.to_clone, code_instance.primary = (repo_default_branch == branch_name,) * 2
+    save_code_archive(clone_working_dir, code_instance, repo, branch_name)
+    code_instance.save()
+    UserPerformance.objects.get_or_create(code=code_instance, user=code_instance.user)
+
+
+def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir):
     repo_default_branch = repo.active_branch.name
     repo_branches = {line.strip().split('origin/')[-1] for line in repo.git.branch('-r').splitlines()}
 
-    for repo_branch_name in repo_branches:
-        code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
-
-        code_instance.to_clone, code_instance.primary = (created and repo_default_branch == repo_branch_name,) * 2
-
-        # noinspection PyUnresolvedReferences
-        if code_instance.commit_sha != repo.branches[repo_branch_name].commit.hexsha or created:
-            save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name)
+    for branch_name in repo_branches:
+        # code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
+        create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance)
 
 
-def save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name):
-    repo.git.checkout(repo_branch_name)
-    branch_head_sha = repo.branches[repo_branch_name].commit.hexsha
+def save_code_archive(clone_working_dir, code_instance, repo, branch_name):
+    if code_instance.commit_sha == repo.refs[f"origin/{branch_name}"].commit.hexsha:
+        print(f"{branch_name} not changed")
+        return
+
+    repo.git.checkout(branch_name)
+    branch_head_sha = repo.branches[branch_name].commit.hexsha
     repo_name = repo.remotes.origin.url.split('.git')[0].split('/')[-1]
     branch_head_commit_time = repo.active_branch.commit.committed_datetime
+
+    code_instance.commit_sha = branch_head_sha
+    code_instance.commit_time = branch_head_commit_time
+    code_instance.has_failed = False
+
     with tempfile.TemporaryFile() as temp_file:
         with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
             for dir_entry in os.listdir(clone_working_dir):
                 # arcname removes temp_dir prefix from tar
                 tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
 
-        code_instance_filename = f"{repo_name}-{repo_branch_name}-{repo.head.reference.commit.hexsha}.tar"
+        code_instance_filename = f"{repo_name}-{branch_name}-{repo.head.reference.commit.hexsha}.tar"
         code_instance.source_code.save(code_instance_filename, File(temp_file))
-    code_instance.commit_sha = branch_head_sha
-    code_instance.commit_time = branch_head_commit_time
-    code_instance.has_failed = False
-    code_instance.save()
 
 
 @shared_task
@@ -157,9 +178,8 @@ def clone_repositories():
     repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
     for repo in repos:
         username = repo["name"][len(prefix):]
-        if User.objects.filter(github_username=username).exists():
-            user_instance = User.objects.get(github_username=username)
+        if (user_instance := User.objects.filter(github_username=username).first()) is not None:
             # if user exists, clone repo and tar directory
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
-                create_or_update_user_code_instance(user_instance, repo_instance, temp_dir)
+                create_or_update_branches(user_instance, repo_instance, temp_dir)
