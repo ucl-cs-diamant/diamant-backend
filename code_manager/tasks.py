@@ -1,5 +1,5 @@
 # import typing
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from celery import shared_task
 # import concurrent.futures
@@ -126,6 +126,29 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
+def update_template(cache_key, update_time_key):
+    template_repo_url = "https://github.com/ucl-cs-diamant/bot-template.git"
+    temp_dir = tempfile.TemporaryDirectory()
+    clone_repo(template_repo_url, temp_dir.name)
+    repo_instance = Repo(temp_dir.name)
+
+    archive = archive_directory(temp_dir.name)
+    mem_buf_archive = archive.read()
+    cache.set(cache_key, mem_buf_archive, timeout=None)
+    cache.set(update_time_key, timezone.now(), timeout=None)
+
+    return temp_dir, repo_instance
+
+
+def extract_from_bytes(source, dest_path):
+    with tempfile.TemporaryFile("w+b") as temp_outfile:
+        temp_outfile.write(source)
+        temp_outfile.flush()
+        temp_outfile.seek(0)
+        with tarfile.open(fileobj=temp_outfile, mode='r') as template_tar:
+            template_tar.extractall(dest_path)
+
+
 def get_template(update=False, cache_key='template_repository',
                  update_time_threshold: int = 3600,
                  update_time_key: str = 'template_repo_last_updated'):
@@ -137,45 +160,27 @@ def get_template(update=False, cache_key='template_repository',
     :param cache_key: Key to use for template cache
     :return: (TemporaryDirectory instance, Repo instance). tempdir instance is needed to keep it in scope
     """
-    template_last_updated = cache.get(update_time_key)
+    template_last_updated = cache.get(update_time_key, default=datetime.utcfromtimestamp(0))
     template_repository = cache.get(cache_key)
-    if template_last_updated is not None and template_repository is not None:
+    if template_repository is not None:
         temp_dir = tempfile.TemporaryDirectory()
-        with tempfile.TemporaryFile("w+b") as temp_outfile:
-            temp_outfile.write(template_repository)
-            temp_outfile.flush()
-            temp_outfile.seek(0)
-            with tarfile.open(fileobj=temp_outfile, mode='r') as template_tar:
-                template_tar.extractall(temp_dir.name)
-
+        extract_from_bytes(template_repository, temp_dir.name)
         repo_instance = Repo(temp_dir.name)
-        # print(repo_instance.active_branch.commit.committed_datetime)
 
         # could be more efficient, but this was written at 4 in the morning
-        # print((timezone.now() - template_last_updated), timedelta(seconds=update_time_threshold))
-        if (timezone.now() - template_last_updated) <= timedelta(seconds=update_time_threshold) and not update:
+        if (timezone.now() - template_last_updated) > timedelta(seconds=update_time_threshold):
+            update = True
+
+        if not update:
             return temp_dir, repo_instance
-        update = True
 
-    if update or template_repository is None or template_last_updated is None:
+    if update or template_repository is None:
         print(f"updating template cache, last update: {template_last_updated}")
-        template_repo_url = "https://github.com/ucl-cs-diamant/bot-template.git"
-        temp_dir = tempfile.TemporaryDirectory()
-        clone_repo(template_repo_url, temp_dir.name)
-        repo_instance = Repo(temp_dir.name)
-
-        print(repo_instance.refs)
-
-        archive = archive_directory(temp_dir.name)
-        mem_buf_archive = archive.read()
-        cache.set(cache_key, mem_buf_archive, timeout=None)
-        cache.set(update_time_key, timezone.now(), timeout=None)
-
-        return temp_dir, repo_instance
+        return update_template(cache_key=cache_key, update_time_key=update_time_key)
 
 
-def clone_from_template(user_instance: User):
-    td, template_repo = get_template()
+def clone_from_template(user_instance: User, update=False):
+    td, template_repo = get_template(update)
     create_or_update_user_code(branch=(template_repo.active_branch.name, template_repo.active_branch.name),
                                clone_working_dir=td.name,
                                repo=template_repo,
