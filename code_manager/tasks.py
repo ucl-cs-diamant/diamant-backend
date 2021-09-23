@@ -124,11 +124,14 @@ def fetch_user_authorization():
 def clone_from_template(user_instance: User, repo: Repo):
     branch_name, repo_default_branch = ("master",) * 2
     with tempfile.TemporaryDirectory() as temp_dir:
-        create_or_update_user_code(branch_name=branch_name, clone_working_dir=temp_dir, repo=repo,
-                                   repo_default_branch=repo_default_branch, user_instance=user_instance)
+        create_or_update_user_code(branch=(branch_name, repo_default_branch), clone_working_dir=temp_dir, repo=repo,
+                                   user_instance=user_instance)
 
 
-def create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance):
+# def create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance):
+def create_or_update_user_code(branch: tuple, clone_working_dir, repo, user_instance):
+    branch_name, repo_default_branch = branch
+
     code_instance = UserCode.objects.filter(user=user_instance, branch=branch_name).first()
     if code_instance is None:
         code_instance = UserCode(user=user_instance, branch=branch_name)
@@ -144,7 +147,8 @@ def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir
 
     for branch_name in repo_branches:
         # code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
-        create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance)
+        create_or_update_user_code(branch=(branch_name, repo_default_branch), clone_working_dir=clone_working_dir,
+                                   repo=repo, user_instance=user_instance)
 
 
 def save_code_archive(clone_working_dir, code_instance, repo, branch_name):
