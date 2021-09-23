@@ -188,6 +188,7 @@ class TemplateCloningTest(TestCase):
 
     def test_create_usercode_instance(self):
         User.objects.create(student_id=1234)
-        code_manager.tasks.create_usercode_instance()
+        with patch('code_manager.tasks.clone_repo', wraps=self.mock_clone_repo):
+            code_manager.tasks.create_usercode_instance()
 
         self.assertEqual(UserCode.objects.all().count(), 1)
