@@ -1,8 +1,14 @@
+# import typing
+from datetime import timedelta, datetime
+
 from celery import shared_task
 # import concurrent.futures
 
 from django.core.files import File
-from game_engine.models import User, UserCode
+from django.core.cache import cache
+from django.utils import timezone
+
+from game_engine.models import User, UserCode, UserPerformance
 
 from git import Repo
 import os
@@ -70,14 +76,17 @@ def check_identity(file_path):
 
 def create_user(student_id, email_address, github_username):
     # get_or_create should be redundant, but it never hurts to be cautious?
-    student_object, created = User.objects.get_or_create(email_address=email_address,
-                                                         student_id=student_id,
-                                                         github_username=github_username)
-    if not created:
-        student_object.student_id = student_id
-        student_object.student_email = email_address
-        student_object.github_username = github_username
-        student_object.save()
+    # student_object, created = User.objects.get_or_create(email_address=email_address,
+    #                                                      student_id=student_id,
+    #                                                      github_username=github_username)
+    # if not created:
+    #     student_object.student_id = student_id
+    #     student_object.student_email = email_address
+    #     student_object.github_username = github_username
+    #     student_object.save()
+    User.objects.get_or_create(email_address=email_address,
+                               student_id=student_id,
+                               github_username=github_username)
 
 
 def clone_repo(repo_url: str, destination: str) -> Repo:
@@ -87,6 +96,7 @@ def clone_repo(repo_url: str, destination: str) -> Repo:
         # repo["clone_url"].split("github.com/")
         repo_url.split("github.com/")
     )
+    print(f"cloning repo {repo_url} for real")
     repo = Repo.clone_from(auth_url_string, destination)
     return repo
 
@@ -106,7 +116,7 @@ def fetch_user_authorization():
             # todo: ####  ADD A TOKEN CHECK, USERS WILL BE PRE-GENERATED INSTEAD OF BEING CREATED HERE ####
             for path in os.listdir(temp_dir):
                 path = os.path.join(temp_dir, path)
-                if os.path.isfile(path) and os.stat(path).st_size >= 1024:  # skip over large files
+                if not os.path.isfile(path) and os.stat(path).st_size >= 1024:  # skip over large files
                     continue
                 if (identity := check_identity(path)) is None:
                     continue
@@ -117,37 +127,117 @@ def fetch_user_authorization():
                 break  # breaks inner loop, resumes outer loop
 
 
-def create_or_update_user_code_instance(user_instance: User, repo: Repo, clone_working_dir):
+def update_template(cache_key, update_time_key):
+    template_repo_url = "https://github.com/ucl-cs-diamant/bot-template.git"
+    temp_dir = tempfile.TemporaryDirectory()
+    clone_repo(template_repo_url, temp_dir.name)
+    repo_instance = Repo(temp_dir.name)
+
+    archive = archive_directory(temp_dir.name)
+    mem_buf_archive = archive.read()
+    cache.set(cache_key, mem_buf_archive, timeout=None)
+    cache.set(update_time_key, timezone.now(), timeout=None)
+
+    return temp_dir, repo_instance
+
+
+def extract_from_bytes_to_temp(source):
+    dest_path = tempfile.TemporaryDirectory()
+    with tempfile.TemporaryFile("w+b") as temp_outfile:
+        temp_outfile.write(source)
+        temp_outfile.flush()
+        temp_outfile.seek(0)
+        with tarfile.open(fileobj=temp_outfile, mode='r') as template_tar:
+            template_tar.extractall(dest_path.name)
+    return dest_path
+
+
+def get_template(update=False,
+                 cache_key='template_repository',
+                 update_time_threshold: int = 3600,
+                 update_time_key: str = 'template_repo_last_updated'):
+    """
+
+    :param update: Force updating template cache
+    :param update_time_threshold: Time to keep template in cache before updating
+    :param update_time_key: Key to use for template cache last updated time
+    :param cache_key: Key to use for template cache
+    :return: (TemporaryDirectory instance, Repo instance). tempdir instance is needed to keep it in scope
+    """
+    template_last_updated = cache.get(update_time_key, default=datetime.fromtimestamp(0).astimezone(timezone.utc))
+    template_repository = cache.get(cache_key)
+
+    if update or template_repository is None:
+        print(f"updating template cache, last update: {template_last_updated}")
+        return update_template(cache_key=cache_key, update_time_key=update_time_key)
+
+    temp_dir = extract_from_bytes_to_temp(template_repository)
+    repo_instance = Repo(temp_dir.name)
+    # could be more efficient, but this was written at 4 in the morning
+    if (timezone.now() - template_last_updated) > timedelta(seconds=update_time_threshold):
+        return update_template(cache_key=cache_key, update_time_key=update_time_key)
+
+    return temp_dir, repo_instance
+
+
+def clone_from_template(user_instance: User, update=False, **kwargs):
+    td, template_repo = get_template(update, **kwargs)
+    create_or_update_user_code(branch=(template_repo.active_branch.name, template_repo.active_branch.name),
+                               clone_working_dir=td.name,
+                               repo=template_repo,
+                               user_instance=user_instance)
+
+
+# def create_or_update_user_code(branch_name, clone_working_dir, repo, repo_default_branch, user_instance):
+def create_or_update_user_code(branch: tuple, clone_working_dir, repo, user_instance):
+    branch_name, repo_default_branch = branch
+
+    code_instance = UserCode.objects.filter(user=user_instance, branch=branch_name).first()
+    if code_instance is None:
+        code_instance = UserCode(user=user_instance, branch=branch_name)
+        code_instance.to_clone, code_instance.primary = (repo_default_branch == branch_name,) * 2
+    save_code_archive(clone_working_dir, code_instance, repo, branch_name)
+    code_instance.save()
+    UserPerformance.objects.get_or_create(code=code_instance, user=code_instance.user)
+
+
+def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir):
     repo_default_branch = repo.active_branch.name
     repo_branches = {line.strip().split('origin/')[-1] for line in repo.git.branch('-r').splitlines()}
 
-    for repo_branch_name in repo_branches:
-        code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
-
-        code_instance.to_clone, code_instance.primary = (created and repo_default_branch == repo_branch_name,) * 2
-
-        # noinspection PyUnresolvedReferences
-        if code_instance.commit_sha != repo.branches[repo_branch_name].commit.hexsha or created:
-            save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name)
+    for branch_name in repo_branches:
+        # code_instance, created = UserCode.objects.get_or_create(user=user_instance, branch=repo_branch_name)
+        create_or_update_user_code(branch=(branch_name, repo_default_branch), clone_working_dir=clone_working_dir,
+                                   repo=repo, user_instance=user_instance)
 
 
-def save_code_archive(clone_working_dir, code_instance, repo, repo_branch_name):
-    repo.git.checkout(repo_branch_name)
-    branch_head_sha = repo.branches[repo_branch_name].commit.hexsha
+def archive_directory(directory):
+    temp_file = tempfile.TemporaryFile()
+    with tarfile.open(fileobj=temp_file, mode="w", format=tarfile.GNU_FORMAT) as tar_out:
+        for dir_entry in os.listdir(directory):
+            # arcname removes temp_dir prefix from tar
+            tar_out.add(os.path.join(directory, dir_entry), arcname=dir_entry)
+    temp_file.seek(0)
+    return temp_file
+
+
+def save_code_archive(clone_working_dir, code_instance, repo, branch_name):
+    if code_instance.commit_sha == repo.refs[f"origin/{branch_name}"].commit.hexsha:
+        print(f"{branch_name} not changed")
+        return
+
+    repo.git.checkout(branch_name)
+    branch_head_sha = repo.branches[branch_name].commit.hexsha
     repo_name = repo.remotes.origin.url.split('.git')[0].split('/')[-1]
     branch_head_commit_time = repo.active_branch.commit.committed_datetime
-    with tempfile.TemporaryFile() as temp_file:
-        with tarfile.open(fileobj=temp_file, mode="w") as tar_out:
-            for dir_entry in os.listdir(clone_working_dir):
-                # arcname removes temp_dir prefix from tar
-                tar_out.add(os.path.join(clone_working_dir, dir_entry), arcname=dir_entry)
 
-        code_instance_filename = f"{repo_name}-{repo_branch_name}-{repo.head.reference.commit.hexsha}.tar"
-        code_instance.source_code.save(code_instance_filename, File(temp_file))
     code_instance.commit_sha = branch_head_sha
     code_instance.commit_time = branch_head_commit_time
     code_instance.has_failed = False
-    code_instance.save()
+
+    temp_file = archive_directory(clone_working_dir)
+    code_instance_filename = f"{repo_name}-{branch_name}-{repo.head.reference.commit.hexsha}.tar"
+    code_instance.source_code.save(code_instance_filename, File(temp_file))
 
 
 @shared_task
@@ -157,9 +247,8 @@ def clone_repositories():
     repos = list_classroom_repos(os.environ.get("GITHUB_API_TOKEN"), "ucl-cs-diamant", prefix=prefix)
     for repo in repos:
         username = repo["name"][len(prefix):]
-        if User.objects.filter(github_username=username).exists():
-            user_instance = User.objects.get(github_username=username)
+        if (user_instance := User.objects.filter(github_username=username).first()) is not None:
             # if user exists, clone repo and tar directory
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_instance = clone_repo(repo["clone_url"], temp_dir)
-                create_or_update_user_code_instance(user_instance, repo_instance, temp_dir)
+                create_or_update_branches(user_instance, repo_instance, temp_dir)

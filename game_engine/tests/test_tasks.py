@@ -77,7 +77,7 @@ class TestTasks(TestCase):
         player_list = models.UserPerformance.objects.all().order_by('mmr')
 
         sublist = tasks.extract_players(player_list, 1, 4)
-        self.assertEqual(sublist, list(player_list.values_list('user', flat=True)))
+        self.assertEqual(sublist, list(player_list.values_list('code', flat=True)))
 
         sublist = tasks.extract_players(player_list, 1, 7)
         self.assertIsNone(sublist)
@@ -86,7 +86,7 @@ class TestTasks(TestCase):
         self.assertIsNone(sublist)
 
         sublist = tasks.extract_players(player_list, 3, 3)
-        self.assertEqual(sublist, list(player_list.values_list('user', flat=True)[1:]))
+        self.assertEqual(sublist, list(player_list.values_list('code', flat=True)[1:]))
 
     def test_evaluate_quality(self):
         user_performance = models.UserPerformance.objects.all().order_by('mmr')
@@ -97,10 +97,10 @@ class TestTasks(TestCase):
 
     def test_find_players(self):
         user_code = models.UserCode.objects.all()
-        player_list, quality = tasks.find_players(user_code, 4)
-        self.assertEqual(player_list, list(models.UserCode.objects.values_list('user', flat=True)))
+        player_list, quality = tasks.find_player_codes(user_code, 4)
+        self.assertEqual(player_list, list(models.UserCode.objects.values_list('pk', flat=True)))
 
-        player_list, quality = tasks.find_players(user_code, 3)
+        player_list, quality = tasks.find_player_codes(user_code, 3)
         self.assertEqual(len(player_list), 3)
 
     @mock.patch.dict(os.environ, {'MATCH_TIMEOUT': '1'})

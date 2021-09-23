@@ -44,7 +44,7 @@ class UserCode(models.Model):
 
 
 class UserPerformance(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # not strictly needed I guess?
     code = models.OneToOneField(UserCode, on_delete=models.CASCADE)
     mmr = models.DecimalField(max_digits=12, decimal_places=6, default=25.00)
     confidence = models.DecimalField(max_digits=12, decimal_places=7, default=8.33333)
