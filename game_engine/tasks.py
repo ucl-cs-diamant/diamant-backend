@@ -185,22 +185,26 @@ def recalculate_leagues(percentiles=(25, 50, 75)):
         matchmaking_task.save()
 
 
+def create_student_records_from_file(file_path: str):
+    with open(file_path, mode='r') as csv_file:
+        csv_reader = csv.DictReader(csv_file)
+        for row in csv_reader:
+            if User.objects.filter(student_id=row["Student ID"]).exists():
+                continue
+            # make a user from the student data
+            User.objects.create(student_id=row["Student ID"],
+                                name=(row["Known As Name"] + " " + row["Surname"]),
+                                programme=row["Programme"],
+                                year=row["Year of Study"],
+                                email_address=None,
+                                github_username=None)
+
+
 @shared_task
 def create_student_records():
-    student_dir = os.environ.get("STUDENT_FILE_DIR", "/home/student-files")
+    student_dir = os.environ.get("STUDENT_FILE_DIR",
+                                 os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__))))
 
     for student_filename in os.listdir(student_dir):
         if student_filename.endswith(".csv"):
-            csv_reader = csv.DictReader(open(os.path.join(student_dir, student_filename), mode='r'))
-
-            for row in csv_reader:
-                if not User.objects.filter(student_id=row["Student ID"]).exists():
-                    # make a user from the student data
-                    user = User.objects.create(student_id=row["Student ID"],
-                                               name=(row["Known As Name"] + " " + row["Surname"]),
-                                               programme=row["Programme"],
-                                               year=row["Year of Study"],
-                                               email_address=None,
-                                               github_username=None)
-
-                    user.save()
+            create_student_records_from_file(os.path.join(student_dir, student_filename))
