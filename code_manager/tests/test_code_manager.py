@@ -76,13 +76,19 @@ class TemplateCloningTest(TestCase):
         return test_out_files
 
     @staticmethod
-    def mock_clone_repo(_, output_dir):
+    def mock_clone_repo_with_sentry(_, output_dir):
         output_dir_path = Path(output_dir)
         with open(os.path.join(__location__, "sample_template.tar"), "rb") as in_tar:
             with tarfile.open(fileobj=in_tar) as tf:
                 tf.extractall(output_dir)
         with open(output_dir_path.joinpath(Path('test_file_sentry')), 'wb') as outfile:
             outfile.write(b"Yep.")
+
+    @staticmethod
+    def mock_clone_repo(_, output_dir):
+        with open(os.path.join(__location__, "sample_template.tar"), "rb") as in_tar:
+            with tarfile.open(fileobj=in_tar) as tf:
+                tf.extractall(output_dir)
 
     def set_template_cache(self):
         with open(os.path.join(__location__, "sample_template.tar"), "rb") as in_tar:
@@ -108,7 +114,7 @@ class TemplateCloningTest(TestCase):
 
     def test_update_template(self):
         sentry_filename = 'test_file_sentry'
-        with patch('code_manager.tasks.clone_repo', wraps=self.mock_clone_repo):
+        with patch('code_manager.tasks.clone_repo', wraps=self.mock_clone_repo_with_sentry):
             temp_dir, repo_instance = code_manager.tasks.update_template(self.test_cache_key, self.test_update_key)
             self.assertTrue(Path(temp_dir.name).joinpath(sentry_filename).exists())
 
@@ -127,7 +133,8 @@ class TemplateCloningTest(TestCase):
         actual_files = self.get_template_files()
 
         with patch('code_manager.tasks.update_template',
-                   wraps=code_manager.tasks.update_template) as update_template_mock:
+                   wraps=code_manager.tasks.update_template) as update_template_mock, \
+                patch('code_manager.tasks.clone_repo', wraps=self.mock_clone_repo):
             td, repo = code_manager.tasks.get_template(cache_key=self.test_cache_key,
                                                        update_time_key=self.test_update_key)
             files_from_template = self.get_files_in_directory(td.name)
@@ -157,7 +164,8 @@ class TemplateCloningTest(TestCase):
         cache.set(self.test_update_key, timezone.now())
 
         with patch('code_manager.tasks.update_template',
-                   wraps=code_manager.tasks.update_template) as update_template_mock:
+                   wraps=code_manager.tasks.update_template) as update_template_mock, \
+                patch('code_manager.tasks.clone_repo', wraps=self.mock_clone_repo):
             td, repo = code_manager.tasks.get_template(cache_key=self.test_cache_key,
                                                        update_time_key=self.test_update_key,
                                                        update=True)
