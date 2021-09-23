@@ -185,3 +185,9 @@ class TemplateCloningTest(TestCase):
         code_manager.tasks.clone_from_template(user, cache_key=self.test_cache_key,
                                                update_time_key=self.test_update_key, )
         self.assertIsNotNone(UserCode.objects.filter(user=user).first())
+
+    def test_create_usercode_instance(self):
+        User.objects.create(student_id=1234)
+        code_manager.tasks.create_usercode_instance()
+
+        self.assertEqual(UserCode.objects.all().count(), 1)
