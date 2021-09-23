@@ -66,7 +66,7 @@ def link_account(request):
                             status=status.HTTP_404_NOT_FOUND)
 
     token_user = matching_user_qs.first()
-    if token_user.github_username != '':
+    if token_user.github_username:
         return JsonResponse({'ok': False, 'message': f"Student ID {token_user.student_id} already "
                                                      f"linked to {token_user.github_username}"},
                             status=status.HTTP_409_CONFLICT)
