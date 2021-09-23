@@ -1,6 +1,6 @@
 # Setup
 ## Requirements
-* Ubuntu Server >20.04
+* Ubuntu Server ~= 20.04 LTS
 * Internet connection
 * bash
 * GitHub API Token with full access
