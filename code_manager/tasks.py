@@ -140,16 +140,19 @@ def update_template(cache_key, update_time_key):
     return temp_dir, repo_instance
 
 
-def extract_from_bytes(source, dest_path):
+def extract_from_bytes_to_temp(source):
+    dest_path = tempfile.TemporaryDirectory()
     with tempfile.TemporaryFile("w+b") as temp_outfile:
         temp_outfile.write(source)
         temp_outfile.flush()
         temp_outfile.seek(0)
         with tarfile.open(fileobj=temp_outfile, mode='r') as template_tar:
-            template_tar.extractall(dest_path)
+            template_tar.extractall(dest_path.name)
+    return dest_path
 
 
-def get_template(update=False, cache_key='template_repository',
+def get_template(update=False,
+                 cache_key='template_repository',
                  update_time_threshold: int = 3600,
                  update_time_key: str = 'template_repo_last_updated'):
     """
@@ -162,21 +165,18 @@ def get_template(update=False, cache_key='template_repository',
     """
     template_last_updated = cache.get(update_time_key, default=datetime.utcfromtimestamp(0))
     template_repository = cache.get(cache_key)
-    if template_repository is not None:
-        temp_dir = tempfile.TemporaryDirectory()
-        extract_from_bytes(template_repository, temp_dir.name)
-        repo_instance = Repo(temp_dir.name)
-
-        # could be more efficient, but this was written at 4 in the morning
-        if (timezone.now() - template_last_updated) > timedelta(seconds=update_time_threshold):
-            update = True
-
-        if not update:
-            return temp_dir, repo_instance
 
     if update or template_repository is None:
         print(f"updating template cache, last update: {template_last_updated}")
         return update_template(cache_key=cache_key, update_time_key=update_time_key)
+
+    temp_dir = extract_from_bytes_to_temp(template_repository)
+    repo_instance = Repo(temp_dir.name)
+    # could be more efficient, but this was written at 4 in the morning
+    if (timezone.now() - template_last_updated) > timedelta(seconds=update_time_threshold):
+        return update_template(cache_key=cache_key, update_time_key=update_time_key)
+
+    return temp_dir, repo_instance
 
 
 def clone_from_template(user_instance: User, update=False):
