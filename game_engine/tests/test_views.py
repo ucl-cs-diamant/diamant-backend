@@ -240,7 +240,7 @@ class TestViews(TestCase):
         request = factory.get('/')
         response = view(request)
 
-        expected = None
+        expected = []
 
         self.assertEqual(expected, response.data)
-        self.assertEqual(204, response.status_code)
+        self.assertEqual(200, response.status_code)

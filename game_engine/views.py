@@ -209,8 +209,8 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
             return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        if objects.count() == 0:
-            return Response(None, status=status.HTTP_204_NO_CONTENT)
+        # if objects.count() == 0:
+        #     return Response(None, status=status.HTTP_204_NO_CONTENT)
         page = self.paginate_queryset(objects)
         if page is not None:
             serializer = UserPerformanceSerializer(page, many=True, context={'request': request})
