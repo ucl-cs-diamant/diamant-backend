@@ -1,3 +1,5 @@
+from distutils.util import strtobool
+
 from django.core.exceptions import FieldError
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -194,8 +196,15 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
             sort_order = ""
         qs = f"{sort_order}{sort_by}"
 
+        include_non_primary = request.query_params.get("non_primary", "false")
         try:
-            objects = UserPerformance.objects.all().order_by(qs)
+            include_non_primary = strtobool(include_non_primary)
+        except ValueError:
+            include_non_primary = False
+
+        try:
+            objects = UserPerformance.objects.all().order_by(qs) if include_non_primary \
+                else UserPerformance.objects.filter(code__primary=True).order_by(qs)
         except FieldError:
             return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
                             status=status.HTTP_400_BAD_REQUEST)
