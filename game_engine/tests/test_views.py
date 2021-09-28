@@ -12,10 +12,10 @@ from collections import OrderedDict
 from game_engine.serializers import UserPerformanceSerializer
 
 
-def create_user(user_id):
+def create_user(user_id, year=1, programme="Bsc Computer Science"):
     user = models.User.objects.create(student_id=user_id,
-                                      programme="Bsc Computer Science",
-                                      year=1,
+                                      programme=programme,
+                                      year=year,
                                       email_address="{name}@ucl.ac.uk".format(name=user_id),
                                       github_username="{name}".format(name=user_id))
     user.save()
@@ -59,7 +59,12 @@ class TestViews(TestCase):
                                                                  code=user_code)
         user_performance.save()
         expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/',
-                    'user_name': '1',
+                    'user_details': {
+                        'user_pk': user.pk,
+                        'name': user.github_username,
+                        'year': user.year,
+                        'programme': user.programme,
+                    },
                     'mmr': 25.000000,
                     'pk': user_performance.pk,
                     'confidence': 8.3333300,
@@ -139,11 +144,19 @@ class TestViews(TestCase):
 
         key_order = UserPerformanceSerializer.Meta.fields
         expected = [OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_name', '2'),
+            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_details',
+                                                                                       {'user_pk': user2.pk,
+                                                                                        'name': user2.github_username,
+                                                                                        'year': user2.year,
+                                                                                        'programme': user2.programme}),
              ('pk', user_performance2.pk),
              ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')),
              ('games_played', 0), ('league', 0), ('user', f'http://testserver/users/{user2.pk}/')]), OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_name', '1'),
+            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_details',
+                                                                                      {'user_pk': user.pk,
+                                                                                       'name': user.github_username,
+                                                                                       'year': user.year,
+                                                                                       'programme': user.programme}),
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
              ('league', 0), ('user', f'http://testserver/users/{user.pk}/')])]
@@ -179,7 +192,11 @@ class TestViews(TestCase):
         expected = [
             OrderedDict(
                 [('url', f'http://testserver/user_performances/{user_performance.pk}/'),
-                 ('user_name', '1'),
+                 ('user_details',
+                  {'user_pk': user.pk,
+                   'name': user.github_username,
+                   'year': user.year,
+                   'programme': user.programme}),
                  ('pk', user_performance.pk),
                  ('mmr', Decimal('25.000000')),
                  ('confidence', Decimal('8.3333300')),
@@ -188,7 +205,11 @@ class TestViews(TestCase):
                  ('user', f'http://testserver/users/{user.pk}/')]),
             OrderedDict(
                 [('url', f'http://testserver/user_performances/{user_performance2.pk}/'),
-                 ('user_name', '2'),
+                 ('user_details',
+                  {'user_pk': user2.pk,
+                   'name': user2.github_username,
+                   'year': user2.year,
+                   'programme': user2.programme}),
                  ('pk', user_performance2.pk),
                  ('mmr', Decimal('27.000000')),
                  ('confidence', Decimal('8.3333300')),
@@ -219,7 +240,7 @@ class TestViews(TestCase):
         request = factory.get('/')
         response = view(request)
 
-        expected = None
+        expected = []
 
         self.assertEqual(expected, response.data)
-        self.assertEqual(204, response.status_code)
+        self.assertEqual(200, response.status_code)

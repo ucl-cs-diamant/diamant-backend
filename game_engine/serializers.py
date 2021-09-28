@@ -54,12 +54,13 @@ class MatchSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
-    user_name = serializers.SerializerMethodField('get_user_name')
+    user_details = serializers.SerializerMethodField('get_user_details')
     pk = serializers.SerializerMethodField('get_pk')
 
     @staticmethod
-    def get_user_name(obj):
-        return obj.user.github_username
+    def get_user_details(obj):
+        return {'user_pk': obj.user.pk, 'name': obj.user.github_username,
+                'year': obj.user.year, 'programme': obj.user.programme}
 
     @staticmethod
     def get_pk(obj):
@@ -67,7 +68,7 @@ class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UserPerformance
-        fields = ['pk', 'url', 'user_name', 'mmr', 'confidence', 'games_played', 'league', 'user']
+        fields = ['pk', 'url', 'mmr', 'confidence', 'games_played', 'league', 'user', 'user_details']
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
