@@ -77,6 +77,17 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserCodeSerializer(serializers.HyperlinkedModelSerializer):
+    id = serializers.ReadOnlyField()
+
     class Meta:
         model = UserCode
-        fields = ['user', 'source_code', 'commit_time', 'has_failed']
+        fields = ['id',
+                  'url',
+                  'user',
+                  'branch',
+                  'source_code',
+                  'to_clone',
+                  'primary',
+                  'commit_time',
+                  'commit_sha',
+                  'has_failed']

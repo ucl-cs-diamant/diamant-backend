@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
+from game_engine.perms import UserOwnsCode
 from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
 from game_engine.serializers import MatchResultSerializer
 
@@ -149,7 +150,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             for player_code, cause in request.data["causes"].items():
                 print(player_code, cause)
                 if cause in ["timeout", "died"]:
-                    pass  # do something if a player times out
+                    pass  # todo: do something if a player times out
 
 
 # noinspection PyMethodMayBeStatic
@@ -179,6 +180,44 @@ class UserCodeViewSet(viewsets.ModelViewSet):
             resp['Content-Disposition'] = f'attachment; filename={os.path.basename(user_code.source_code.name)}'
             return resp
         return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
+
+    @action(detail=False, permission_classes=[UserOwnsCode], methods=['POST'])
+    def update_enabled_codes(self, request):
+        source = request.data
+        if request.headers.get('content-type', None) in ["multipart/form-data", "application/x-www-form-urlencoded"]:
+            source = request.POST
+
+        if "enabled_codes" in source:
+            print(f"codes to enable: {source['enabled_codes']}")
+
+        parsed_ids = set()
+        for code in source['enabled_codes']:
+            try:
+                code = int(code)
+                if code in parsed_ids:  # ignore duplicates
+                    continue
+                parsed_ids.add(code)
+
+                code = UserCode.objects.get(pk=code)
+                self.check_object_permissions(request, code)
+
+                if code.primary:  # primary code must be cloned
+                    continue
+
+                code.to_clone = True
+                code.save()
+            except ValueError:
+                return Response(f"Value '{code}' cannot be parsed", status=status.HTTP_400_BAD_REQUEST)
+            except UserCode.DoesNotExist:
+                return Response(f"Code instance {code} does not exist", status=status.HTTP_400_BAD_REQUEST)
+            # except rest_framework.exceptions.APIException as e:
+            #     print(e)
+
+        UserCode.objects.filter(user__github_username=request.session.get('github_username')).exclude(
+            pk__in=parsed_ids).update(to_clone=False)
+
+        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''} "
+                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])}")
 
 
 class UserPerformanceViewSet(viewsets.ModelViewSet):
