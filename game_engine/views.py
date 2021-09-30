@@ -9,9 +9,10 @@ from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.routers import APIRootView
 
 from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
-from game_engine.perms import UserOwnsCode
+from game_engine.perms import UserLoggedInAndOwnsCode
 from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
 from game_engine.serializers import MatchResultSerializer
 
@@ -155,9 +156,9 @@ class MatchViewSet(viewsets.ModelViewSet):
                     pass  # todo: do something if a player times out
 
 
-# noinspection PyMethodMayBeStatic
 class MatchProvider(viewsets.ViewSet):
-    def list(self, request):
+    @staticmethod
+    def list(request):
         available_matches = Match.objects.filter(allocated__isnull=True, in_progress=False, over=False)
         if available_matches.count() > 0:
             match = random.choice(available_matches)
@@ -169,28 +170,28 @@ class MatchProvider(viewsets.ViewSet):
         return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 
-class UserCodeViewSet(viewsets.ModelViewSet):
-    queryset = UserCode.objects.all()
-    serializer_class = UserCodeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+class SettingsViewSet(viewsets.ViewSet):
+    basename = "settings"
 
-    @action(detail=True, permission_classes=[])
-    def download(self, request, pk=None):
-        user_code = UserCode.objects.filter(pk=pk).first()
-        if user_code is not None:
-            resp = HttpResponse(user_code.source_code.file, content_type="application/octet-stream")
-            resp['Content-Disposition'] = f'attachment; filename={os.path.basename(user_code.source_code.name)}'
-            return resp
-        return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
+    def list(self, request):
+        api_root_dict = {act.__name__: f"{self.basename}-{act.__name__.replace('_', '-')}" for act in
+                         self.get_extra_actions()}
 
-    @action(detail=False, permission_classes=[UserOwnsCode], methods=['POST'])
+        # noinspection PyProtectedMember
+        return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
+
+    @action(detail=False, methods=['get', 'post'])
+    def account_settings(self, request):
+        return Response()
+
+    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
     def update_enabled_codes(self, request):
         source = request.data
         if request.headers.get('content-type', None) in ["multipart/form-data", "application/x-www-form-urlencoded"]:
             source = request.POST
 
-        if "enabled_codes" in source:
-            print(f"codes to enable: {source['enabled_codes']}")
+        if "enabled_codes" not in source:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
         parsed_ids = set()
         for code in source['enabled_codes']:
@@ -220,6 +221,21 @@ class UserCodeViewSet(viewsets.ModelViewSet):
 
         return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''} "
                         f"{', '.join([str(uc_id) for uc_id in parsed_ids])}")
+
+
+class UserCodeViewSet(viewsets.ModelViewSet):
+    queryset = UserCode.objects.all()
+    serializer_class = UserCodeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, permission_classes=[])
+    def download(self, request, pk=None):
+        user_code = UserCode.objects.filter(pk=pk).first()
+        if user_code is not None:
+            resp = HttpResponse(user_code.source_code.file, content_type="application/octet-stream")
+            resp['Content-Disposition'] = f'attachment; filename={os.path.basename(user_code.source_code.name)}'
+            return resp
+        return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
 
 
 class UserPerformanceViewSet(viewsets.ModelViewSet):

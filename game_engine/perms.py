@@ -3,7 +3,7 @@ from rest_framework import permissions
 from game_engine.models import User, UserCode
 
 
-class UserOwnsCode(permissions.BasePermission):
+class UserLoggedInAndOwnsCode(permissions.BasePermission):
     message = "You do not have permission to perform this action."
 
     def has_permission(self, request, view):
