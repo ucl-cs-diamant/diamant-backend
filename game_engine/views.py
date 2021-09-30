@@ -21,6 +21,7 @@ import random
 import os
 from trueskill import Rating, rate
 
+
 # import oauth.utils
 
 
@@ -220,6 +221,7 @@ class MatchResultViewSet(viewsets.ModelViewSet):
 
 class SettingsViewSet(viewsets.ViewSet):
     basename = "settings"
+
     # authentication_classes = [oauth.utils.CustomSessionAuthentication]
     # permission_classes = [permissions.IsAuthenticated]
 
@@ -230,24 +232,33 @@ class SettingsViewSet(viewsets.ViewSet):
         # noinspection PyProtectedMember
         return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
 
-    @action(detail=False, methods=['get', 'post'])
+    @action(detail=False, methods=['get', 'post'], permission_classes=[UserLoggedInAndOwnsCode])
     def account_settings(self, request):
         gh_un = request.session.get('github_username')
         _ = User.objects.get(github_username=gh_un)
 
         return Response()
 
-    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
-    def update_enabled_codes(self, request):
-        source = request.data
-        if request.headers.get('content-type', None) in ["multipart/form-data", "application/x-www-form-urlencoded"]:
-            source = request.POST
+    def enable_codes(self, request, parsed_ids: set = None):
+        """
+        Enables code instances using incoming request data.
 
-        if "enabled_codes" not in source:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        :param request: incoming DRF request instance
+        :param parsed_ids: optional parsed_ids set with existing IDs
+        :return: 2-tuple: (success, result)
+        If successful, data is a set of parsed code IDs. Otherwise, result is a 2-tuple containing (failure message,
+        status code)
+        """
+        if "enabled_codes" not in request.data:
+            if parsed_ids is not None:  # already set if `primary` was passed to request, in which case no error
+                return True, parsed_ids
+            return False, ("No codes to enable", status.HTTP_400_BAD_REQUEST)
+        if type(request.data['enabled_codes']) != list:
+            return False, ("enabled_codes not a list", status.HTTP_400_BAD_REQUEST)
 
-        parsed_ids = set()
-        for code in source['enabled_codes']:
+        parsed_ids = set() if parsed_ids is None else parsed_ids
+        _code_instances = set()
+        for code in request.data['enabled_codes']:
             try:
                 code = int(code)
                 if code in parsed_ids:  # ignore duplicates
@@ -261,16 +272,61 @@ class SettingsViewSet(viewsets.ViewSet):
                     continue
 
                 code.to_clone = True
-                code.save()
-            except ValueError:
-                return Response(f"Value '{code}' cannot be parsed", status=status.HTTP_400_BAD_REQUEST)
+                # code.save()
+                _code_instances.add(code)
+            except (ValueError, TypeError):
+                return False, (f"Value '{code}' not an ID", status.HTTP_400_BAD_REQUEST)
             except UserCode.DoesNotExist:
-                return Response(f"Code instance {code} does not exist", status=status.HTTP_400_BAD_REQUEST)
-            # except rest_framework.exceptions.APIException as e:
-            #     print(e)
+                return False, (f"Code instance {code} does not exist", status.HTTP_400_BAD_REQUEST)
+
+        # save all updated code instances
+        [code.save() for code in _code_instances]
+        return True, parsed_ids
+
+    def set_primary_code(self, request, parsed_ids: set = None):
+        """
+        Sets a code instance as primary
+        :param request:
+        :param parsed_ids:
+        :return:
+        """
+        parsed_ids = set() if parsed_ids is None else parsed_ids
+
+        if "primary" not in request.data:  # not an error, report as success
+            return True, None
+
+        try:
+            code = int(request.data['primary'])
+            parsed_ids.add(code)
+
+            code = UserCode.objects.get(pk=code)
+            self.check_object_permissions(request, code)
+
+            UserCode.objects.filter(user__github_username=request.session.get('github_username'),
+                                    primary=True).update(primary=False)
+            code.primary = True
+            code.to_clone = True
+            code.save()
+
+        except (ValueError, TypeError):
+            return False, (f"Value '{request.data['primary']}' not an ID", status.HTTP_400_BAD_REQUEST)
+        except UserCode.DoesNotExist:
+            return False, (f"Code instance {request.data['primary']} does not exist", status.HTTP_400_BAD_REQUEST)
+
+        return True, parsed_ids
+
+    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
+    def update_enabled_codes(self, request):
+        success, result = self.set_primary_code(request)
+        if not success:
+            return Response(*result)
+        success, result = self.enable_codes(request, parsed_ids=result)
+        if not success:
+            return Response(*result)
+        parsed_ids = result
 
         UserCode.objects.filter(user__github_username=request.session.get('github_username')).exclude(
             pk__in=parsed_ids).update(to_clone=False)
 
-        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''} "
-                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])}")
+        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''}: "
+                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])} ")
