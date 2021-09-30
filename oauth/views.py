@@ -22,6 +22,7 @@ redirect_uri = "http://hopefullyup.compositegrid.com:8727/oauth/callback"
 redirect_uri = urllib.parse.quote(redirect_uri)
 a = f"https://github.com/login/oauth/authorize?client_id=b681a270eb0071a810bd&scope={scopes}" \
     f"&redirect_uri={redirect_uri}"
+# print(a)
 
 
 # todo: replace these views with DRF views

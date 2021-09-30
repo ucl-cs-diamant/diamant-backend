@@ -1,4 +1,4 @@
-from game_engine.models import Match, User, UserPerformance, UserCode
+from game_engine.models import Match, User, UserPerformance, UserCode, UserSettings
 from game_engine.models import MatchResult
 from rest_framework import serializers
 import os
@@ -62,6 +62,7 @@ class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
         return {'user_pk': obj.user.pk, 'name': obj.user.github_username,
                 'year': obj.user.year, 'programme': obj.user.programme}
 
+    # todo: replace with built-in 'id' field
     @staticmethod
     def get_pk(obj):
         return obj.pk
@@ -78,6 +79,25 @@ class UserSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class UserCodeSerializer(serializers.HyperlinkedModelSerializer):
+    id = serializers.ReadOnlyField()
+
     class Meta:
         model = UserCode
-        fields = ['user', 'source_code', 'commit_time', 'has_failed']
+        fields = ['id',
+                  'url',
+                  'user',
+                  'branch',
+                  'source_code',
+                  'to_clone',
+                  'primary',
+                  'commit_time',
+                  'commit_sha',
+                  'has_failed']
+
+
+class UserSettingsSerializer(serializers.HyperlinkedModelSerializer):
+    user = serializers.HyperlinkedRelatedField(view_name='user-detail', queryset=User.objects.all())
+
+    class Meta:
+        model = UserSettings
+        fields = ['user', 'hide_identity', 'display_name']

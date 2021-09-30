@@ -31,6 +31,13 @@ class User(models.Model):
                                             editable=False, default=hex_token)
 
 
+class UserSettings(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+
+    hide_identity = models.BooleanField(default=True)
+    display_name = models.CharField(max_length=48, unique=True, blank=True, null=True)
+
+
 class UserCode(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     source_code = models.FileField(upload_to=get_filename)
