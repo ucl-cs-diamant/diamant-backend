@@ -255,6 +255,54 @@ class TestSettingsView(TestCase):
         self.user_codes[0].to_clone = True
         self.user_codes[0].save()
 
+        self.user_settings = models.UserSettings.objects.create(user=self.user)
+
+    def test_get_account_settings(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'get': 'account_settings'})
+
+        expected = {'user': f'http://testserver/users/{self.user.pk}/', 'hide_identity': True, 'display_name': None}
+
+        request = factory.get('/')
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
+
+    def test_update_account_settings(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'account_settings'})
+
+        self.assertEqual(True, self.user_settings.hide_identity)
+
+        request = factory.post('/', {'hide_identity': False})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+
+        self.user_settings.refresh_from_db()
+        self.assertEqual(False, self.user_settings.hide_identity)
+
+    def test_update_account_settings_invalid_data(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'account_settings'})
+
+        self.assertEqual(True, self.user_settings.hide_identity)
+
+        request = factory.post('/', {'hide_identity': "totally a boolean"})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+
+        self.user_settings.refresh_from_db()
+        self.assertEqual(True, self.user_settings.hide_identity)
+
     def test_set_primary_code(self):
         factory = APIRequestFactory()
 

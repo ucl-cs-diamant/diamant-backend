@@ -12,9 +12,10 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.routers import APIRootView
 
-from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
-from game_engine.perms import UserLoggedInAndOwnsCode
-from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
+from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance, UserSettings
+from game_engine.perms import UserLoggedIn, UserLoggedInAndOwnsCode
+from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer, \
+    UserSettingsSerializer
 from game_engine.serializers import MatchResultSerializer
 
 import random
@@ -213,6 +214,7 @@ class MatchResultViewSet(viewsets.ModelViewSet):
 
 class SettingsViewSet(viewsets.ViewSet):
     basename = "settings"
+
     # authentication_classes = [oauth.utils.CustomSessionAuthentication]
     # permission_classes = [permissions.IsAuthenticated]
 
@@ -223,12 +225,24 @@ class SettingsViewSet(viewsets.ViewSet):
         # noinspection PyProtectedMember
         return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
 
-    @action(detail=False, methods=['get', 'post'], permission_classes=[UserLoggedInAndOwnsCode])
+    @action(detail=False, methods=['GET', 'POST'], permission_classes=[UserLoggedIn])
     def account_settings(self, request):
         gh_un = request.session.get('github_username')
-        _ = User.objects.get(github_username=gh_un)
+        user_settings = UserSettings.objects.get(user__github_username=gh_un)
 
-        return Response()
+        if request.method == "GET":
+            serializer = UserSettingsSerializer(user_settings, context={'request': request})
+            return Response(serializer.data)
+
+        if request.method == 'POST':
+            serializer = UserSettingsSerializer(user_settings,
+                                                data=request.data,
+                                                partial=True,
+                                                context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def enable_codes(self, request, processed_ids: set = None):
         """
