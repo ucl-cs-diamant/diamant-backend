@@ -5,6 +5,7 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
 from rest_framework import viewsets
+# from rest_framework import authentication
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
@@ -19,6 +20,8 @@ from game_engine.serializers import MatchResultSerializer
 import random
 import os
 from trueskill import Rating, rate
+
+# import oauth.utils
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -217,6 +220,8 @@ class MatchResultViewSet(viewsets.ModelViewSet):
 
 class SettingsViewSet(viewsets.ViewSet):
     basename = "settings"
+    # authentication_classes = [oauth.utils.CustomSessionAuthentication]
+    # permission_classes = [permissions.IsAuthenticated]
 
     def list(self, request):
         api_root_dict = {act.__name__: f"{self.basename}-{act.__name__.replace('_', '-')}" for act in
@@ -227,6 +232,9 @@ class SettingsViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get', 'post'])
     def account_settings(self, request):
+        gh_un = request.session.get('github_username')
+        _ = User.objects.get(github_username=gh_un)
+
         return Response()
 
     @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
