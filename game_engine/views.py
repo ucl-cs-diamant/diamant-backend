@@ -230,17 +230,6 @@ class SettingsViewSet(viewsets.ViewSet):
 
         return Response()
 
-    # amazing name
-    @staticmethod
-    def parse_list_of_str_to_int(list_to_parse: list):
-        output = []
-        try:
-            for str_to_parse in list_to_parse:
-                output.append(int(str_to_parse))
-        except (ValueError, TypeError):
-            return False, []
-        return True, output
-
     def enable_codes(self, request, processed_ids: set = None):
         """
         Enables code instances using incoming request data.
@@ -315,5 +304,5 @@ class SettingsViewSet(viewsets.ViewSet):
         user_codes.exclude(pk__in=processed_ids).exclude(primary=True).update(to_clone=False)
 
         enabled_user_codes = user_codes.filter(to_clone=True).values_list('pk', flat=True)
-        return Response(f"Enabled UserCode id{'s' if len(enabled_user_codes) > 1 else ''}: "
+        return Response(f"Enabled UserCode ID{'s' if len(enabled_user_codes) > 1 else ''}: "
                         f"{', '.join([str(uc_id) for uc_id in enabled_user_codes])} ")
