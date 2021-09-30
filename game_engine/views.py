@@ -25,8 +25,6 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    # permission_classes = [permissions.IsAuthenticated]
-
     @action(detail=True)
     def user_code_list(self, request, pk=None):
         objects = UserCode.objects.filter(user_id=pk)
@@ -34,16 +32,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(None, status=status.HTTP_204_NO_CONTENT)
         serializer = UserCodeSerializer(objects, many=True, context={'request': request})
         return Response(serializer.data)
-
-    # @action(detail=True, permission_classes=[])
-    # def latest_code(self, request, pk=None):
-    #     user_code = UserCode.objects.filter(user=pk)
-    #     if user_code.exists():
-    #         latest_code = user_code.latest("commit_time")
-    #         resp = HttpResponse(latest_code.source_code.file, content_type="application/octet-stream")
-    #         resp['Content-Disposition'] = f'attachment; filename={os.path.basename(latest_code.source_code.name)}'
-    #         return resp
-    #     return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
 
     @action(detail=True)
     def performance_list(self, request, pk=None):
@@ -170,59 +158,6 @@ class MatchProvider(viewsets.ViewSet):
         return Response(None, status=status.HTTP_204_NO_CONTENT)
 
 
-class SettingsViewSet(viewsets.ViewSet):
-    basename = "settings"
-
-    def list(self, request):
-        api_root_dict = {act.__name__: f"{self.basename}-{act.__name__.replace('_', '-')}" for act in
-                         self.get_extra_actions()}
-
-        # noinspection PyProtectedMember
-        return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
-
-    @action(detail=False, methods=['get', 'post'])
-    def account_settings(self, request):
-        return Response()
-
-    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
-    def update_enabled_codes(self, request):
-        source = request.data
-        if request.headers.get('content-type', None) in ["multipart/form-data", "application/x-www-form-urlencoded"]:
-            source = request.POST
-
-        if "enabled_codes" not in source:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        parsed_ids = set()
-        for code in source['enabled_codes']:
-            try:
-                code = int(code)
-                if code in parsed_ids:  # ignore duplicates
-                    continue
-                parsed_ids.add(code)
-
-                code = UserCode.objects.get(pk=code)
-                self.check_object_permissions(request, code)
-
-                if code.primary:  # primary code must be cloned
-                    continue
-
-                code.to_clone = True
-                code.save()
-            except ValueError:
-                return Response(f"Value '{code}' cannot be parsed", status=status.HTTP_400_BAD_REQUEST)
-            except UserCode.DoesNotExist:
-                return Response(f"Code instance {code} does not exist", status=status.HTTP_400_BAD_REQUEST)
-            # except rest_framework.exceptions.APIException as e:
-            #     print(e)
-
-        UserCode.objects.filter(user__github_username=request.session.get('github_username')).exclude(
-            pk__in=parsed_ids).update(to_clone=False)
-
-        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''} "
-                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])}")
-
-
 class UserCodeViewSet(viewsets.ModelViewSet):
     queryset = UserCode.objects.all()
     serializer_class = UserCodeSerializer
@@ -278,3 +213,56 @@ class MatchResultViewSet(viewsets.ModelViewSet):
     queryset = MatchResult.objects.all()
     serializer_class = MatchResultSerializer
     # permission_classes = [permissions.IsAuthenticated]
+
+
+class SettingsViewSet(viewsets.ViewSet):
+    basename = "settings"
+
+    def list(self, request):
+        api_root_dict = {act.__name__: f"{self.basename}-{act.__name__.replace('_', '-')}" for act in
+                         self.get_extra_actions()}
+
+        # noinspection PyProtectedMember
+        return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
+
+    @action(detail=False, methods=['get', 'post'])
+    def account_settings(self, request):
+        return Response()
+
+    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
+    def update_enabled_codes(self, request):
+        source = request.data
+        if request.headers.get('content-type', None) in ["multipart/form-data", "application/x-www-form-urlencoded"]:
+            source = request.POST
+
+        if "enabled_codes" not in source:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+        parsed_ids = set()
+        for code in source['enabled_codes']:
+            try:
+                code = int(code)
+                if code in parsed_ids:  # ignore duplicates
+                    continue
+                parsed_ids.add(code)
+
+                code = UserCode.objects.get(pk=code)
+                self.check_object_permissions(request, code)
+
+                if code.primary:  # primary code must be cloned
+                    continue
+
+                code.to_clone = True
+                code.save()
+            except ValueError:
+                return Response(f"Value '{code}' cannot be parsed", status=status.HTTP_400_BAD_REQUEST)
+            except UserCode.DoesNotExist:
+                return Response(f"Code instance {code} does not exist", status=status.HTTP_400_BAD_REQUEST)
+            # except rest_framework.exceptions.APIException as e:
+            #     print(e)
+
+        UserCode.objects.filter(user__github_username=request.session.get('github_username')).exclude(
+            pk__in=parsed_ids).update(to_clone=False)
+
+        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''} "
+                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])}")
