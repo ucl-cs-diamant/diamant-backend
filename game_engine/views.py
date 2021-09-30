@@ -260,34 +260,14 @@ class SettingsViewSet(viewsets.ViewSet):
 
         processed_ids = set() if processed_ids is None else processed_ids
 
-        _success = True
-        _message = None
+        id_queue = set(request.data['enabled_codes']) - processed_ids
+        user_codes = UserCode.objects.filter(pk__in=id_queue)
+        [self.check_object_permissions(request, code) for code in user_codes]
+        user_codes.update(to_clone=True)
 
-        parse_success, id_queue = self.parse_list_of_str_to_int(request.data['enabled_codes'])
-        if not parse_success:
-            _success, _message = False, (f"'{request.data['enabled_codes']}' contains an invalid ID",
-                                         status.HTTP_400_BAD_REQUEST)
+        processed_ids = set.union(id_queue, processed_ids)
 
-        _code_instances = set()
-        for code in id_queue:
-            try:
-                if code in processed_ids:  # ignore duplicates
-                    continue
-                processed_ids.add(code)
-
-                code = UserCode.objects.get(pk=code)
-                self.check_object_permissions(request, code)
-
-                code.to_clone = True
-                _code_instances.add(code)
-            except UserCode.DoesNotExist:
-                _success, _message = False, (f"Code instance {code} does not exist", status.HTTP_400_BAD_REQUEST)
-                break
-
-        # save all updated code instances
-        [code.save() for code in _code_instances]
-
-        return _success, processed_ids if _success else _message
+        return True, processed_ids
 
     def set_primary_code(self, request, parsed_ids: set = None):
         """
@@ -329,10 +309,11 @@ class SettingsViewSet(viewsets.ViewSet):
         success, result = self.enable_codes(request, processed_ids=result)
         if not success:
             return Response(*result)
-        parsed_ids = result
+        processed_ids: set = result
 
-        UserCode.objects.filter(user__github_username=request.session.get('github_username')).exclude(
-            pk__in=parsed_ids).update(to_clone=False)
+        user_codes = UserCode.objects.filter(user__github_username=request.session.get('github_username'))
+        user_codes.exclude(pk__in=processed_ids).exclude(primary=True).update(to_clone=False)
 
-        return Response(f"Enabled UserCode id{'s' if len(parsed_ids) > 1 else ''}: "
-                        f"{', '.join([str(uc_id) for uc_id in parsed_ids])} ")
+        enabled_user_codes = user_codes.filter(to_clone=True).values_list('pk', flat=True)
+        return Response(f"Enabled UserCode id{'s' if len(enabled_user_codes) > 1 else ''}: "
+                        f"{', '.join([str(uc_id) for uc_id in enabled_user_codes])} ")
