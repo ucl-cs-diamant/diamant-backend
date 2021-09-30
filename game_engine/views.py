@@ -22,9 +22,6 @@ import os
 from trueskill import Rating, rate
 
 
-# import oauth.utils
-
-
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -115,8 +112,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             up_instance.games_played += 1
             up_instance.save()
 
-            # pull player elo and confidence amounts
-            player_elo = up_instance.mmr
+            player_elo = up_instance.mmr  # pull player elo and confidence amounts
             player_confidence = up_instance.confidence
 
             rating = Rating(float(player_elo), float(player_confidence))
@@ -181,8 +177,6 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
     queryset = UserPerformance.objects.all()
     serializer_class = UserPerformanceSerializer
 
-    # permission_classes = []
-
     def list(self, request, **kwargs):
         sort_by = request.query_params.get("sort", "mmr")
         sort_order = "-"
@@ -203,8 +197,6 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
             return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        # if objects.count() == 0:
-        #     return Response(None, status=status.HTTP_204_NO_CONTENT)
         page = self.paginate_queryset(objects)
         if page is not None:
             serializer = UserPerformanceSerializer(page, many=True, context={'request': request})
@@ -221,7 +213,6 @@ class MatchResultViewSet(viewsets.ModelViewSet):
 
 class SettingsViewSet(viewsets.ViewSet):
     basename = "settings"
-
     # authentication_classes = [oauth.utils.CustomSessionAuthentication]
     # permission_classes = [permissions.IsAuthenticated]
 
@@ -239,49 +230,64 @@ class SettingsViewSet(viewsets.ViewSet):
 
         return Response()
 
-    def enable_codes(self, request, parsed_ids: set = None):
+    # amazing name
+    @staticmethod
+    def parse_list_of_str_to_int(list_to_parse: list):
+        output = []
+        try:
+            for str_to_parse in list_to_parse:
+                output.append(int(str_to_parse))
+        except (ValueError, TypeError):
+            return False, []
+        return True, output
+
+    def enable_codes(self, request, processed_ids: set = None):
         """
         Enables code instances using incoming request data.
 
         :param request: incoming DRF request instance
-        :param parsed_ids: optional parsed_ids set with existing IDs
+        :param processed_ids: optional parsed_ids set with existing IDs
         :return: 2-tuple: (success, result)
         If successful, data is a set of parsed code IDs. Otherwise, result is a 2-tuple containing (failure message,
         status code)
         """
         if "enabled_codes" not in request.data:
-            if parsed_ids is not None:  # already set if `primary` was passed to request, in which case no error
-                return True, parsed_ids
+            if processed_ids is not None:  # already set if `primary` was passed to request, in which case no error
+                return True, processed_ids
             return False, ("No codes to enable", status.HTTP_400_BAD_REQUEST)
         if type(request.data['enabled_codes']) != list:
             return False, ("enabled_codes not a list", status.HTTP_400_BAD_REQUEST)
 
-        parsed_ids = set() if parsed_ids is None else parsed_ids
+        processed_ids = set() if processed_ids is None else processed_ids
+
+        _success = True
+        _message = None
+
+        parse_success, id_queue = self.parse_list_of_str_to_int(request.data['enabled_codes'])
+        if not parse_success:
+            _success, _message = False, (f"'{request.data['enabled_codes']}' contains an invalid ID",
+                                         status.HTTP_400_BAD_REQUEST)
+
         _code_instances = set()
-        for code in request.data['enabled_codes']:
+        for code in id_queue:
             try:
-                code = int(code)
-                if code in parsed_ids:  # ignore duplicates
+                if code in processed_ids:  # ignore duplicates
                     continue
-                parsed_ids.add(code)
+                processed_ids.add(code)
 
                 code = UserCode.objects.get(pk=code)
                 self.check_object_permissions(request, code)
 
-                if code.primary:  # primary code must be cloned
-                    continue
-
                 code.to_clone = True
-                # code.save()
                 _code_instances.add(code)
-            except (ValueError, TypeError):
-                return False, (f"Value '{code}' not an ID", status.HTTP_400_BAD_REQUEST)
             except UserCode.DoesNotExist:
-                return False, (f"Code instance {code} does not exist", status.HTTP_400_BAD_REQUEST)
+                _success, _message = False, (f"Code instance {code} does not exist", status.HTTP_400_BAD_REQUEST)
+                break
 
         # save all updated code instances
         [code.save() for code in _code_instances]
-        return True, parsed_ids
+
+        return _success, processed_ids if _success else _message
 
     def set_primary_code(self, request, parsed_ids: set = None):
         """
@@ -320,7 +326,7 @@ class SettingsViewSet(viewsets.ViewSet):
         success, result = self.set_primary_code(request)
         if not success:
             return Response(*result)
-        success, result = self.enable_codes(request, parsed_ids=result)
+        success, result = self.enable_codes(request, processed_ids=result)
         if not success:
             return Response(*result)
         parsed_ids = result
