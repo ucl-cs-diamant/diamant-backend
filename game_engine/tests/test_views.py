@@ -306,7 +306,7 @@ class TestSettingsView(TestCase):
     def test_set_primary_code(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         request = factory.post('/', {'primary': self.user_codes[0].pk})
         request.session = {'github_username': self.user.github_username}
@@ -331,7 +331,7 @@ class TestSettingsView(TestCase):
     def test_set_primary_code_bad_id_1(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         bad_id = [self.user_codes[1].pk]
         request = factory.post('/', {'primary': bad_id}, format="json")
@@ -346,7 +346,7 @@ class TestSettingsView(TestCase):
     def test_set_primary_code_bad_id_2(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         bad_id = 3875423896
         request = factory.post('/', {'primary': bad_id}, format="json")
@@ -360,7 +360,7 @@ class TestSettingsView(TestCase):
     def test_set_primary_code_missing_key(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         # need to pass enabled codes, otherwise 400
         request = factory.post('/', {'lol_wrong_key': 'whatever', 'enabled_codes': []}, format="json")
@@ -373,7 +373,7 @@ class TestSettingsView(TestCase):
     def test_enable_codes(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         self.assertEqual(False, self.user_codes[3].to_clone)
 
@@ -391,7 +391,7 @@ class TestSettingsView(TestCase):
     def test_enable_codes_not_list(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         self.assertEqual(False, self.user_codes[3].to_clone)
 
@@ -407,7 +407,7 @@ class TestSettingsView(TestCase):
     def test_enable_codes_no_codes(self):
         factory = APIRequestFactory()
 
-        view = views.SettingsViewSet.as_view({'post': 'update_enabled_codes'})
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
 
         self.assertEqual(False, self.user_codes[3].to_clone)
 
@@ -417,3 +417,28 @@ class TestSettingsView(TestCase):
 
         self.assertEqual(400, response.status_code)
         self.assertEqual("No codes to enable", response.data)
+
+    def test_get_codes(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'get': 'enabled_codes'})
+
+        request = factory.get('/', {}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        expected = {ci.pk: {'branch_name': ci.branch,
+                            'enabled': ci.to_clone,
+                            'primary': ci.primary} for ci in self.user_codes}
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
+
+        self.user_codes[2].to_clone = True
+        self.user_codes[2].save()
+
+        expected.get(self.user_codes[2].pk)['enabled'] = True
+
+        response = view(request)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
