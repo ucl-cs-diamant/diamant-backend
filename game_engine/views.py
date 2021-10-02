@@ -304,7 +304,6 @@ class SettingsViewSet(viewsets.ViewSet):
 
         return True, parsed_ids
 
-    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['POST'])
     def update_enabled_codes(self, request):
         success, result = self.set_primary_code(request)
         if not success:
@@ -320,3 +319,19 @@ class SettingsViewSet(viewsets.ViewSet):
         enabled_user_codes = user_codes.filter(to_clone=True).values_list('pk', flat=True)
         return Response(f"Enabled UserCode ID{'s' if len(enabled_user_codes) > 1 else ''}: "
                         f"{', '.join([str(uc_id) for uc_id in enabled_user_codes])} ")
+
+    @staticmethod
+    def get_codes_settings(request):
+        request_user = User.objects.get(github_username=request.session.get('github_username'))
+        user_codes = UserCode.objects.filter(user=request_user)
+        response_data = {uc.pk: {'branch_name': uc.branch,
+                                 'primary': uc.primary,
+                                 'enabled': uc.to_clone} for uc in user_codes}
+        return Response(response_data)
+
+    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['GET', 'POST'])
+    def enabled_codes(self, request):
+        if request.method == "POST":
+            return self.update_enabled_codes(request)
+
+        return self.get_codes_settings(request)
