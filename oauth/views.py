@@ -1,12 +1,16 @@
+import os
+
 from django.http import JsonResponse
 # from django.shortcuts import render
 # from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.shortcuts import redirect
 from rest_framework import status
 
 from game_engine.models import User
 from . import utils
 import urllib.parse
+
 
 # Create your views here.
 # see https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps
@@ -14,18 +18,29 @@ import urllib.parse
 # scopes:     read:user  user:email
 # client id:  b681a270eb0071a810bd
 
-scopes = "read:user user:email"
-scopes = urllib.parse.quote(scopes)
+# scopes = "read:user user:email"
+# scopes = urllib.parse.quote(scopes)
 
 # noinspection HttpUrlsUsage
-redirect_uri = "http://hopefullyup.compositegrid.com:8727/oauth/callback"
-redirect_uri = urllib.parse.quote(redirect_uri)
-a = f"https://github.com/login/oauth/authorize?client_id=b681a270eb0071a810bd&scope={scopes}" \
-    f"&redirect_uri={redirect_uri}"
+# redirect_uri = "http://hopefullyup.compositegrid.com:8727/oauth/callback"
+# redirect_uri = urllib.parse.quote(redirect_uri)
+# a = f"https://github.com/login/oauth/authorize?client_id=b681a270eb0071a810bd&scope={scopes}" \
+#     f"&redirect_uri={redirect_uri}"
 # print(a)
 
 
 # todo: replace these views with DRF views
+
+
+@require_http_methods(["GET"])
+def redirect_to_github(request):
+    scopes = urllib.parse.quote(os.environ.get('GITHUB_OAUTH_SCOPES'))
+    redirect_uri = urllib.parse.quote(os.environ.get('GITHUB_OAUTH_CALLBACK_URI'))
+    github_login_target = f"https://github.com/login/oauth/authorize" \
+                          f"?client_id={os.environ.get('GITHUB_OAUTH_CLIENT_ID')}" \
+                          f"&scope={scopes}" \
+                          f"&redirect_uri={redirect_uri}"
+    return redirect(github_login_target)
 
 
 @require_http_methods(["GET"])
