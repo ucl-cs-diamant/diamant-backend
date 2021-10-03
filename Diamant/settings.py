@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -28,6 +28,11 @@ SECRET_KEY = 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 load_dotenv(Path.joinpath(BASE_DIR, ".env"))
+
+assert os.environ.get('GITHUB_OAUTH_CLIENT_ID') is not None
+assert os.environ.get('GITHUB_OAUTH_CLIENT_SECRET') is not None
+assert os.environ.get('GITHUB_OAUTH_SCOPES') is not None
+assert os.environ.get('GITHUB_OAUTH_CALLBACK_URI') is not None
 
 ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
 ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
