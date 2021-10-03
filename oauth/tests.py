@@ -63,7 +63,8 @@ class LinkAccountEndpoint(TestCase):
 
         response = self.client.get("/oauth/link_account")
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get('github_username'), 'ILW8')
 
     def test_invalid_token(self):  # token does not match any user in db
         session = self.client.session
