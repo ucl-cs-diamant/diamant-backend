@@ -28,6 +28,7 @@ router.register(r'matches', views.MatchViewSet)
 router.register(r'request_match', views.MatchProvider, basename="request_match")
 router.register(r'code_list', views.UserCodeViewSet)
 router.register(r'match_history', views.MatchResultViewSet)
+router.register(r'settings', views.SettingsViewSet, basename=views.SettingsViewSet.basename)
 
 
 urlpatterns = [

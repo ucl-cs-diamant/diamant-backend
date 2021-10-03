@@ -5,13 +5,17 @@ from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 
 from rest_framework import viewsets
+# from rest_framework import authentication
 from rest_framework import permissions
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.routers import APIRootView
 
-from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance
-from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer
+from game_engine.models import Match, User, UserCode, MatchResult, UserPerformance, UserSettings
+from game_engine.perms import UserLoggedIn, UserLoggedInAndOwnsCode
+from game_engine.serializers import UserSerializer, MatchSerializer, UserCodeSerializer, UserPerformanceSerializer, \
+    UserSettingsSerializer
 from game_engine.serializers import MatchResultSerializer
 
 import random
@@ -23,8 +27,6 @@ class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
-    # permission_classes = [permissions.IsAuthenticated]
-
     @action(detail=True)
     def user_code_list(self, request, pk=None):
         objects = UserCode.objects.filter(user_id=pk)
@@ -32,16 +34,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response(None, status=status.HTTP_204_NO_CONTENT)
         serializer = UserCodeSerializer(objects, many=True, context={'request': request})
         return Response(serializer.data)
-
-    # @action(detail=True, permission_classes=[])
-    # def latest_code(self, request, pk=None):
-    #     user_code = UserCode.objects.filter(user=pk)
-    #     if user_code.exists():
-    #         latest_code = user_code.latest("commit_time")
-    #         resp = HttpResponse(latest_code.source_code.file, content_type="application/octet-stream")
-    #         resp['Content-Disposition'] = f'attachment; filename={os.path.basename(latest_code.source_code.name)}'
-    #         return resp
-    #     return Response(status=status.HTTP_404_NOT_FOUND)  # this should not happen to the game runner (matchmaking)
 
     @action(detail=True)
     def performance_list(self, request, pk=None):
@@ -121,8 +113,7 @@ class MatchViewSet(viewsets.ModelViewSet):
             up_instance.games_played += 1
             up_instance.save()
 
-            # pull player elo and confidence amounts
-            player_elo = up_instance.mmr
+            player_elo = up_instance.mmr  # pull player elo and confidence amounts
             player_confidence = up_instance.confidence
 
             rating = Rating(float(player_elo), float(player_confidence))
@@ -151,12 +142,12 @@ class MatchViewSet(viewsets.ModelViewSet):
             for player_code, cause in request.data["causes"].items():
                 print(player_code, cause)
                 if cause in ["timeout", "died"]:
-                    pass  # do something if a player times out
+                    pass  # todo: do something if a player times out
 
 
-# noinspection PyMethodMayBeStatic
 class MatchProvider(viewsets.ViewSet):
-    def list(self, request):
+    @staticmethod
+    def list(request):
         available_matches = Match.objects.filter(allocated__isnull=True, in_progress=False, over=False)
         if available_matches.count() > 0:
             match = random.choice(available_matches)
@@ -187,8 +178,6 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
     queryset = UserPerformance.objects.all()
     serializer_class = UserPerformanceSerializer
 
-    # permission_classes = []
-
     def list(self, request, **kwargs):
         sort_by = request.query_params.get("sort", "mmr")
         sort_order = "-"
@@ -209,8 +198,6 @@ class UserPerformanceViewSet(viewsets.ModelViewSet):
             return Response({"ok": False, "message": f"Unknown sort field '{sort_by}'"},
                             status=status.HTTP_400_BAD_REQUEST)
 
-        # if objects.count() == 0:
-        #     return Response(None, status=status.HTTP_204_NO_CONTENT)
         page = self.paginate_queryset(objects)
         if page is not None:
             serializer = UserPerformanceSerializer(page, many=True, context={'request': request})
@@ -223,3 +210,128 @@ class MatchResultViewSet(viewsets.ModelViewSet):
     queryset = MatchResult.objects.all()
     serializer_class = MatchResultSerializer
     # permission_classes = [permissions.IsAuthenticated]
+
+
+class SettingsViewSet(viewsets.ViewSet):
+    basename = "settings"
+
+    # authentication_classes = [oauth.utils.CustomSessionAuthentication]
+    # permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        api_root_dict = {act.__name__: f"{self.basename}-{act.__name__.replace('_', '-')}" for act in
+                         self.get_extra_actions()}
+
+        # noinspection PyProtectedMember
+        return APIRootView.as_view(api_root_dict=api_root_dict)(request._request)
+
+    @action(detail=False, methods=['GET', 'POST'], permission_classes=[UserLoggedIn])
+    def account_settings(self, request):
+        gh_un = request.session.get('github_username')
+        user_settings = UserSettings.objects.get(user__github_username=gh_un)
+
+        if request.method == "GET":
+            serializer = UserSettingsSerializer(user_settings, context={'request': request})
+            return Response(serializer.data)
+
+        if request.method == 'POST':
+            serializer = UserSettingsSerializer(user_settings,
+                                                data=request.data,
+                                                partial=True,
+                                                context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def enable_codes(self, request, processed_ids: set = None):
+        """
+        Enables code instances using incoming request data.
+
+        :param request: incoming DRF request instance
+        :param processed_ids: optional parsed_ids set with existing IDs
+        :return: 2-tuple: (success, result)
+        If successful, data is a set of parsed code IDs. Otherwise, result is a 2-tuple containing (failure message,
+        status code)
+        """
+        if "enabled_codes" not in request.data:
+            if processed_ids is not None:  # already set if `primary` was passed to request, in which case no error
+                return True, processed_ids
+            return False, ("No codes to enable", status.HTTP_400_BAD_REQUEST)
+        if type(request.data['enabled_codes']) != list:
+            return False, ("enabled_codes not a list", status.HTTP_400_BAD_REQUEST)
+
+        processed_ids = set() if processed_ids is None else processed_ids
+
+        id_queue = set(request.data['enabled_codes']) - processed_ids
+        user_codes = UserCode.objects.filter(pk__in=id_queue)
+        [self.check_object_permissions(request, code) for code in user_codes]
+        user_codes.update(to_clone=True)
+
+        processed_ids = set.union(id_queue, processed_ids)
+
+        return True, processed_ids
+
+    def set_primary_code(self, request, parsed_ids: set = None):
+        """
+        Sets a code instance as primary
+        :param request:
+        :param parsed_ids:
+        :return:
+        """
+        parsed_ids = set() if parsed_ids is None else parsed_ids
+
+        if "primary" not in request.data:  # not an error, report as success
+            return True, None
+
+        try:
+            code = int(request.data['primary'])
+            parsed_ids.add(code)
+
+            code = UserCode.objects.get(pk=code)
+            self.check_object_permissions(request, code)
+
+            UserCode.objects.filter(user__github_username=request.session.get('github_username'),
+                                    primary=True).update(primary=False)
+            code.primary = True
+            code.to_clone = True
+            code.save()
+
+        except (ValueError, TypeError):
+            return False, (f"Value '{request.data['primary']}' not an ID", status.HTTP_400_BAD_REQUEST)
+        except UserCode.DoesNotExist:
+            return False, (f"Code instance {request.data['primary']} does not exist", status.HTTP_400_BAD_REQUEST)
+
+        return True, parsed_ids
+
+    def update_enabled_codes(self, request):
+        success, result = self.set_primary_code(request)
+        if not success:
+            return Response(*result)
+        success, result = self.enable_codes(request, processed_ids=result)
+        if not success:
+            return Response(*result)
+        processed_ids: set = result
+
+        user_codes = UserCode.objects.filter(user__github_username=request.session.get('github_username'))
+        user_codes.exclude(pk__in=processed_ids).exclude(primary=True).update(to_clone=False)
+
+        enabled_user_codes = user_codes.filter(to_clone=True).values_list('pk', flat=True)
+        return Response(f"Enabled UserCode ID{'s' if len(enabled_user_codes) > 1 else ''}: "
+                        f"{', '.join([str(uc_id) for uc_id in enabled_user_codes])} ")
+
+    @staticmethod
+    def get_codes_settings(request):
+        request_user = User.objects.get(github_username=request.session.get('github_username'))
+        user_codes = UserCode.objects.filter(user=request_user)
+        response_data = {uc.pk: {'branch_name': uc.branch,
+                                 'primary': uc.primary,
+                                 'enabled': uc.to_clone} for uc in user_codes}
+        return Response(response_data)
+
+    @action(detail=False, permission_classes=[UserLoggedInAndOwnsCode], methods=['GET', 'POST'])
+    def enabled_codes(self, request):
+        if request.method == "POST":
+            return self.update_enabled_codes(request)
+
+        return self.get_codes_settings(request)

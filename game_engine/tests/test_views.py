@@ -244,3 +244,201 @@ class TestViews(TestCase):
 
         self.assertEqual(expected, response.data)
         self.assertEqual(200, response.status_code)
+
+
+class TestSettingsView(TestCase):
+    def setUp(self) -> None:
+        self.user = create_user(user_id=1)
+        self.user_codes = [models.UserCode.objects.create(user=self.user, commit_time=timezone.now())
+                           for _ in range(5)]
+        self.user_codes[0].primary = True
+        self.user_codes[0].to_clone = True
+        self.user_codes[0].save()
+
+        self.user_settings = models.UserSettings.objects.create(user=self.user)
+
+    def test_get_account_settings(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'get': 'account_settings'})
+
+        expected = {'user': f'http://testserver/users/{self.user.pk}/', 'hide_identity': True, 'display_name': None}
+
+        request = factory.get('/')
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
+
+    def test_update_account_settings(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'account_settings'})
+
+        self.assertEqual(True, self.user_settings.hide_identity)
+
+        request = factory.post('/', {'hide_identity': False})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+
+        self.user_settings.refresh_from_db()
+        self.assertEqual(False, self.user_settings.hide_identity)
+
+    def test_update_account_settings_invalid_data(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'account_settings'})
+
+        self.assertEqual(True, self.user_settings.hide_identity)
+
+        request = factory.post('/', {'hide_identity': "totally a boolean"})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+
+        self.user_settings.refresh_from_db()
+        self.assertEqual(True, self.user_settings.hide_identity)
+
+    def test_set_primary_code(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        request = factory.post('/', {'primary': self.user_codes[0].pk})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.user_codes[1].refresh_from_db()
+        self.assertEqual(True, self.user_codes[0].to_clone)
+        self.assertEqual(True, self.user_codes[0].primary)
+
+        request = factory.post('/', {'primary': self.user_codes[1].pk})
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.user_codes[1].refresh_from_db()
+        self.assertEqual(True, self.user_codes[1].to_clone)
+        self.assertEqual(True, self.user_codes[1].primary)
+        self.user_codes[0].refresh_from_db()
+        self.assertEqual(False, self.user_codes[0].primary)
+
+    def test_set_primary_code_bad_id_1(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        bad_id = [self.user_codes[1].pk]
+        request = factory.post('/', {'primary': bad_id}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(f"Value '{bad_id}' not an ID", response.data)
+        self.assertEqual(True, self.user_codes[0].primary)
+        self.assertEqual(False, self.user_codes[1].primary)
+
+    def test_set_primary_code_bad_id_2(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        bad_id = 3875423896
+        request = factory.post('/', {'primary': bad_id}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual(True, self.user_codes[0].primary)
+        self.assertEqual(f"Code instance {bad_id} does not exist", response.data)
+
+    def test_set_primary_code_missing_key(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        # need to pass enabled codes, otherwise 400
+        request = factory.post('/', {'lol_wrong_key': 'whatever', 'enabled_codes': []}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(True, self.user_codes[0].primary)
+
+    def test_enable_codes(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        self.assertEqual(False, self.user_codes[3].to_clone)
+
+        request = factory.post('/', {'enabled_codes': [self.user_codes[3].pk]}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(200, response.status_code)
+        self.user_codes[3].refresh_from_db()
+        self.user_codes[0].refresh_from_db()
+        self.assertEqual(True, self.user_codes[3].to_clone)
+        self.assertEqual(True, self.user_codes[0].primary)
+        self.assertEqual(True, self.user_codes[0].to_clone)
+
+    def test_enable_codes_not_list(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        self.assertEqual(False, self.user_codes[3].to_clone)
+
+        request = factory.post('/', {'enabled_codes': self.user_codes[3].pk}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+        self.user_codes[3].refresh_from_db()
+        self.assertEqual(False, self.user_codes[3].to_clone)
+        self.assertEqual("enabled_codes not a list", response.data)
+
+    def test_enable_codes_no_codes(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'post': 'enabled_codes'})
+
+        self.assertEqual(False, self.user_codes[3].to_clone)
+
+        request = factory.post('/', {}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        self.assertEqual(400, response.status_code)
+        self.assertEqual("No codes to enable", response.data)
+
+    def test_get_codes(self):
+        factory = APIRequestFactory()
+
+        view = views.SettingsViewSet.as_view({'get': 'enabled_codes'})
+
+        request = factory.get('/', {}, format="json")
+        request.session = {'github_username': self.user.github_username}
+        response = view(request)
+
+        expected = {ci.pk: {'branch_name': ci.branch,
+                            'enabled': ci.to_clone,
+                            'primary': ci.primary} for ci in self.user_codes}
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
+
+        self.user_codes[2].to_clone = True
+        self.user_codes[2].save()
+
+        expected.get(self.user_codes[2].pk)['enabled'] = True
+
+        response = view(request)
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(expected, response.data)
