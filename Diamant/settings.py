@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
 import os
-import sys
+import warnings
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -20,22 +20,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_ROOT = Path.joinpath(BASE_DIR, "media")
 MEDIA_URL = "/media/"
 
+load_dotenv(Path.joinpath(BASE_DIR, ".env"))
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-load_dotenv(Path.joinpath(BASE_DIR, ".env"))
 
-# eh kind of a hack
-if 'unittest' not in sys.modules:
-    assert os.environ.get('GITHUB_OAUTH_CLIENT_ID') is not None
-    assert os.environ.get('GITHUB_OAUTH_CLIENT_SECRET') is not None
-    assert os.environ.get('GITHUB_OAUTH_SCOPES') is not None
-    assert os.environ.get('GITHUB_OAUTH_CALLBACK_URI') is not None
+if len(missing_config := [key for key in ['GITHUB_OAUTH_CLIENT_ID',
+                                          'GITHUB_OAUTH_CLIENT_SECRET',
+                                          'GITHUB_OAUTH_SCOPES',
+                                          'GITHUB_OAUTH_CALLBACK_URI'] if os.environ.get(key) is None]):
+    warnings.warn(f"Missing environment/conf variable(s) {', '.join(missing_config)}")
 
 ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
 ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
