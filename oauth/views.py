@@ -66,6 +66,7 @@ def oauth_code_callback(request):
 
 
 # @csrf_exempt
+# todo: clear up these responses, make it more api-like rather than human readable
 @require_http_methods(["GET", "POST"])
 def link_account(request):
     if (github_username := request.session.get('github_username', None)) is None:
@@ -73,8 +74,8 @@ def link_account(request):
                             status=status.HTTP_401_UNAUTHORIZED)
 
     if (link_token := utils.get_token(request)) is None:
-        return JsonResponse({'ok': False, 'message': 'Account link token missing'},
-                            status=status.HTTP_400_BAD_REQUEST)
+        return JsonResponse({'ok': True,
+                             'github_username': request.session.get('github_username')})
 
     matching_user_qs = User.objects.filter(authentication_token=link_token)
     if not matching_user_qs:
