@@ -12,12 +12,13 @@ from collections import OrderedDict
 from game_engine.serializers import UserPerformanceSerializer
 
 
-def create_user(user_id, year=1, programme="Bsc Computer Science"):
+def create_user(user_id, year=1, programme="Bsc Computer Science", name="Placeholder Name"):
     user = models.User.objects.create(student_id=user_id,
                                       programme=programme,
                                       year=year,
                                       email_address="{name}@ucl.ac.uk".format(name=user_id),
-                                      github_username="{name}".format(name=user_id))
+                                      github_username="{name}".format(name=user_id),
+                                      name=name)
     user.save()
     return user
 
@@ -248,7 +249,7 @@ class TestViews(TestCase):
 
 class TestSettingsView(TestCase):
     def setUp(self) -> None:
-        self.user = create_user(user_id=1)
+        self.user = create_user(user_id=1, name="First Last")
         self.user_codes = [models.UserCode.objects.create(user=self.user, commit_time=timezone.now())
                            for _ in range(5)]
         self.user_codes[0].primary = True
@@ -262,12 +263,20 @@ class TestSettingsView(TestCase):
 
         view = views.SettingsViewSet.as_view({'get': 'account_settings'})
 
-        expected = {'user': f'http://testserver/users/{self.user.pk}/', 'hide_identity': True, 'display_name': None}
+        expected = {'user': f'http://testserver/users/{self.user.pk}/',
+                    'hide_identity': True,
+                    'display_name': 1,
+                    'display_name_options': {
+                        'GitHub Username': {'option': 0, 'value': self.user.github_username},
+                        'Student ID': {'option': 1, 'value': self.user.student_id},
+                        'First and last names': {'option': 2, 'value': self.user.name}
+                    }}
 
         request = factory.get('/')
         request.session = {'github_username': self.user.github_username}
         response = view(request)
 
+        print(response.data)
         self.assertEqual(200, response.status_code)
         self.assertEqual(expected, response.data)
 
