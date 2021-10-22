@@ -47,7 +47,7 @@ class TestViews(TestCase):
         self.user_viewset = views.UserViewSet()
 
     def test_empty_performance_list(self):
-        response = self.client.get("/users/1/performance_list", follow=True)
+        response = self.client.get("/api/users/1/performance_list", follow=True)
         self.assertEqual(response.status_code, 204)
 
     def test_performance_list(self):
@@ -59,7 +59,7 @@ class TestViews(TestCase):
                                                                  confidence=8.33333,
                                                                  code=user_code)
         user_performance.save()
-        expected = {'url': f'http://testserver/user_performances/{user_performance.pk}/',
+        expected = {'url': f'http://testserver/api/user_performances/{user_performance.pk}/',
                     'user_details': {
                         'user_pk': user.pk,
                         'name': user.github_username,
@@ -71,14 +71,14 @@ class TestViews(TestCase):
                     'confidence': 8.3333300,
                     'games_played': 0,
                     'league': 0,
-                    'user': f'http://testserver/users/{user.pk}/'}
+                    'user': f'http://testserver/api/users/{user.pk}/'}
 
-        response = self.client.get(f"/users/{user.pk}/performance_list", follow=True)
+        response = self.client.get(f"/api/users/{user.pk}/performance_list", follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()[0], expected)
 
     def test_user_match_list_empty(self):
-        response = self.client.get("/users/1/user_match_list", follow=True)
+        response = self.client.get("/api/users/1/user_match_list", follow=True)
         self.assertEqual(response.status_code, 204)
 
     def test_user_match_list(self):
@@ -87,14 +87,14 @@ class TestViews(TestCase):
         user_match = create_match_result_entry(user)
 
         expected = [{'match_id': user_match.pk,
-                     'url': f'http://testserver/match_history/{user_match.pk}/',
+                     'url': f'http://testserver/api/match_history/{user_match.pk}/',
                      'match_events': [],
                      'players': f'[{user.pk}]',
                      'winners': f'[{user.pk}]',
                      'time_started': '2021-08-07T18:48:40Z',
                      'time_finished': '2021-08-07T18:48:45Z'}]
 
-        response = self.client.get(f"/users/{user.pk}/user_match_list/", follow=True)
+        response = self.client.get(f"/api/users/{user.pk}/user_match_list/", follow=True)
         self.assertEqual(response.json()['results'], expected)
         self.assertEqual(response.json()['count'], 1)
         self.assertEqual(response.json()['next'], None)
@@ -111,7 +111,7 @@ class TestViews(TestCase):
         response = view(request, pk=user.pk)
 
         expected = [{'match_id': user_match.pk,
-                     'url': f'http://testserver/match_history/{user_match.pk}/',
+                     'url': f'http://testserver/api/match_history/{user_match.pk}/',
                      'match_events': [],
                      'players': f'[{user.pk}]',
                      'winners': f'[{user.pk}]',
@@ -145,22 +145,22 @@ class TestViews(TestCase):
 
         key_order = UserPerformanceSerializer.Meta.fields
         expected = [OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance2.pk}/'), ('user_details',
+            [('url', f'http://testserver/api/user_performances/{user_performance2.pk}/'), ('user_details',
                                                                                        {'user_pk': user2.pk,
                                                                                         'name': user2.github_username,
                                                                                         'year': user2.year,
                                                                                         'programme': user2.programme}),
              ('pk', user_performance2.pk),
              ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')),
-             ('games_played', 0), ('league', 0), ('user', f'http://testserver/users/{user2.pk}/')]), OrderedDict(
-            [('url', f'http://testserver/user_performances/{user_performance.pk}/'), ('user_details',
+             ('games_played', 0), ('league', 0), ('user', f'http://testserver/api/users/{user2.pk}/')]), OrderedDict(
+            [('url', f'http://testserver/api/user_performances/{user_performance.pk}/'), ('user_details',
                                                                                       {'user_pk': user.pk,
                                                                                        'name': user.github_username,
                                                                                        'year': user.year,
                                                                                        'programme': user.programme}),
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
-             ('league', 0), ('user', f'http://testserver/users/{user.pk}/')])]
+             ('league', 0), ('user', f'http://testserver/api/users/{user.pk}/')])]
         expected = [{key: od[key] for key in key_order} for od in expected]
 
         self.assertSequenceEqual(expected, response.data)
@@ -192,7 +192,7 @@ class TestViews(TestCase):
         key_order = UserPerformanceSerializer.Meta.fields
         expected = [
             OrderedDict(
-                [('url', f'http://testserver/user_performances/{user_performance.pk}/'),
+                [('url', f'http://testserver/api/user_performances/{user_performance.pk}/'),
                  ('user_details',
                   {'user_pk': user.pk,
                    'name': user.github_username,
@@ -203,9 +203,9 @@ class TestViews(TestCase):
                  ('confidence', Decimal('8.3333300')),
                  ('games_played', 0),
                  ('league', 0),
-                 ('user', f'http://testserver/users/{user.pk}/')]),
+                 ('user', f'http://testserver/api/users/{user.pk}/')]),
             OrderedDict(
-                [('url', f'http://testserver/user_performances/{user_performance2.pk}/'),
+                [('url', f'http://testserver/api/user_performances/{user_performance2.pk}/'),
                  ('user_details',
                   {'user_pk': user2.pk,
                    'name': user2.github_username,
@@ -216,7 +216,7 @@ class TestViews(TestCase):
                  ('confidence', Decimal('8.3333300')),
                  ('games_played', 0),
                  ('league', 0),
-                 ('user', f'http://testserver/users/{user2.pk}/')])
+                 ('user', f'http://testserver/api/users/{user2.pk}/')])
         ]
         expected = [{key: od[key] for key in key_order} for od in expected]
 
@@ -263,7 +263,7 @@ class TestSettingsView(TestCase):
 
         view = views.SettingsViewSet.as_view({'get': 'account_settings'})
 
-        expected = {'user': f'http://testserver/users/{self.user.pk}/',
+        expected = {'user': f'http://testserver/api/users/{self.user.pk}/',
                     'hide_identity': True,
                     'display_name': 1,
                     'display_name_options': {
