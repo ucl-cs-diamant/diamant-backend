@@ -30,10 +30,11 @@ router.register(r'code_list', views.UserCodeViewSet)
 router.register(r'match_history', views.MatchResultViewSet)
 router.register(r'settings', views.SettingsViewSet, basename=views.SettingsViewSet.basename)
 
-
 urlpatterns = [
-    path('', include(router.urls)),
-    path('admin/', admin.site.urls),
-    path('api-auth/', include('rest_framework.urls')),
-    path('oauth/', include('oauth.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('api/', include([
+                             path('', include(router.urls)),
+                             path('admin/', admin.site.urls),
+                             path('api-auth/', include('rest_framework.urls')),
+                             path('oauth/', include('oauth.urls')),
+                         ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)))
+]
