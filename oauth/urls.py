@@ -16,4 +16,5 @@ urlpatterns = [
     # url(r'user/settings$', views.get_settings)
     url(r'callback', views.oauth_code_callback),
     url(r'link_account', views.link_account),
+    url(r'login', views.redirect_to_github),
 ]

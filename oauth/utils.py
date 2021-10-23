@@ -1,10 +1,12 @@
+import json
+import requests
 import os
 from typing import Union
 
-import json
-
 import django.http.request
-import requests
+from rest_framework.authentication import BaseAuthentication
+
+from game_engine.models import User
 
 
 def exchange_code_for_token(code: str, endpoint="https://github.com/login/oauth/access_token") -> Union[None, dict]:
@@ -50,3 +52,14 @@ def get_token(request):
         return link_token
     except django.http.request.RawPostDataException:
         return link_token
+
+
+class CustomSessionAuthentication(BaseAuthentication):
+    def authenticate(self, request):
+        user = request.session.get('github_username', None)
+        if user is not None:
+            user = User.objects.get(github_username=user)
+        return user, None
+
+    def authenticate_header(self, _):
+        return "Not logged in, log in."

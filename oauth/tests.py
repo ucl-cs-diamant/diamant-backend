@@ -3,6 +3,7 @@ from unittest import mock
 
 import json
 import requests
+import urllib.parse
 from django.test import TestCase, RequestFactory
 from game_engine.models import User
 
@@ -51,6 +52,27 @@ class CallbackEndpoint(TestCase):
         self.assertNotContains(response, "redirect")
 
 
+class TestLoginUtils(TestCase):
+    def setUp(self) -> None:
+        self.client_id = 'testclientidthanks'
+        self.oauth_scopes = 'read:user user:email'
+
+    def test_redirect_no_config(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            response = self.client.get("/api/oauth/login")  # redirect_to_github
+        self.assertEqual(response.status_code, 500)
+
+    def test_redirect(self):
+        with mock.patch.dict(os.environ, {'GITHUB_OAUTH_CLIENT_ID': self.client_id,
+                                          'GITHUB_OAUTH_SCOPES': self.oauth_scopes}):
+            response = self.client.get("/api/oauth/login")  # redirect_to_github
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"https://github.com/login/oauth/authorize?"
+                                       f"client_id={self.client_id}&"
+                                       f"scope={urllib.parse.quote(self.oauth_scopes)}&"
+                                       f"redirect_uri=http://testserver/api/oauth/callback")
+
+
 class LinkAccountEndpoint(TestCase):
     def test_not_logged_in(self):
         response = self.client.get("/api/oauth/link_account")
@@ -63,7 +85,8 @@ class LinkAccountEndpoint(TestCase):
 
         response = self.client.get("/api/oauth/link_account")
 
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json().get('github_username'), 'ILW8')
 
     def test_invalid_token(self):  # token does not match any user in db
         session = self.client.session
