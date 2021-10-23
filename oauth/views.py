@@ -34,10 +34,16 @@ import urllib.parse
 
 @require_http_methods(["GET"])
 def redirect_to_github(request):
-    scopes = urllib.parse.quote(os.environ.get('GITHUB_OAUTH_SCOPES'))
-    redirect_uri = urllib.parse.quote(os.environ.get('GITHUB_OAUTH_CALLBACK_URI'))
+    scopes = os.environ.get('GITHUB_OAUTH_SCOPES')
+    client_id = os.environ.get('GITHUB_OAUTH_CLIENT_ID')
+    if None in [scopes, client_id]:
+        return JsonResponse({'ok': False, 'message': 'Misconfigured server, missing client_id and scopes.'},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    scopes = urllib.parse.quote(scopes)
+    redirect_uri = f"{request.scheme}://{request.get_host()}/api/oauth/callback"
     github_login_target = f"https://github.com/login/oauth/authorize" \
-                          f"?client_id={os.environ.get('GITHUB_OAUTH_CLIENT_ID')}" \
+                          f"?client_id={client_id}" \
                           f"&scope={scopes}" \
                           f"&redirect_uri={redirect_uri}"
     return redirect(github_login_target)

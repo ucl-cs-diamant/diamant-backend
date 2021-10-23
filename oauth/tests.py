@@ -3,6 +3,7 @@ from unittest import mock
 
 import json
 import requests
+import urllib.parse
 from django.test import TestCase, RequestFactory
 from game_engine.models import User
 
@@ -49,6 +50,27 @@ class CallbackEndpoint(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Logged in as ILW8")
         self.assertNotContains(response, "redirect")
+
+
+class TestLoginUtils(TestCase):
+    def setUp(self) -> None:
+        self.client_id = 'testclientidthanks'
+        self.oauth_scopes = 'read:user user:email'
+
+    def test_redirect_no_config(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            response = self.client.get("/api/oauth/login")  # redirect_to_github
+        self.assertEqual(response.status_code, 500)
+
+    def test_redirect(self):
+        with mock.patch.dict(os.environ, {'GITHUB_OAUTH_CLIENT_ID': self.client_id,
+                                          'GITHUB_OAUTH_SCOPES': self.oauth_scopes}):
+            response = self.client.get("/api/oauth/login")  # redirect_to_github
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f"https://github.com/login/oauth/authorize?"
+                                       f"client_id={self.client_id}&"
+                                       f"scope={urllib.parse.quote(self.oauth_scopes)}&"
+                                       f"redirect_uri=http://testserver/api/oauth/callback")
 
 
 class LinkAccountEndpoint(TestCase):
