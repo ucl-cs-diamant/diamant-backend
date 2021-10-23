@@ -35,7 +35,15 @@ class UserSettings(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
 
     hide_identity = models.BooleanField(default=True)
-    display_name = models.CharField(max_length=48, unique=True, blank=True, null=True)
+
+    class DisplayNameSettings(models.IntegerChoices):
+        GITHUB_USERNAME = 0, _("GitHub Username")
+        STUDENT_ID = 1, _("Student ID")
+        NAME = 2, _("First and last names")
+
+    display_name = models.IntegerField(choices=DisplayNameSettings.choices,
+                                       null=False,
+                                       default=DisplayNameSettings.STUDENT_ID)
 
 
 class UserCode(models.Model):

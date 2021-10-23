@@ -46,6 +46,8 @@ class MatchSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Match
         fields = ['game_id', 'allocated', 'in_progress', 'players', 'decision_timeout']
+
+
 #
 #
 # class MatchResultSerializer(serializers.HyperlinkedModelSerializer):
@@ -97,7 +99,19 @@ class UserCodeSerializer(serializers.HyperlinkedModelSerializer):
 
 class UserSettingsSerializer(serializers.HyperlinkedModelSerializer):
     user = serializers.HyperlinkedRelatedField(view_name='user-detail', queryset=User.objects.all())
+    display_name_options = serializers.SerializerMethodField()
+
+    @staticmethod
+    def get_display_name_options(obj: UserSettings):
+        # UserSettings.DisplayNameSettings member names correspond to User model field names.
+        # DisplayNameSettings(<key>) returns enum member, can access member name using .name (non-translated version)
+        # (see https://docs.djangoproject.com/en/3.2/ref/models/fields/#enumeration-types)
+        # using getattr, can dynamically get user instance fields using enum member name
+        return {
+            str(value): {'option': key, 'value': getattr(obj.user, UserSettings.DisplayNameSettings(key).name.lower())}
+            for key, value in UserSettings.DisplayNameSettings.choices
+        }
 
     class Meta:
         model = UserSettings
-        fields = ['user', 'hide_identity', 'display_name']
+        fields = ['user', 'hide_identity', 'display_name', 'display_name_options']
