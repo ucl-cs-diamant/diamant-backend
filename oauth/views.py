@@ -103,5 +103,11 @@ def link_account(request):
 
     token_user.github_username = github_username
     token_user.save()
-    return JsonResponse({'ok': True, 'message': f"Successfully linked student ID {token_user.student_id} "
-                                                f"to {github_username}"}, status=status.HTTP_201_CREATED)
+    user_serializer = UserSerializer(token_user,
+                                     many=False,
+                                     context={'request': request})
+    return JsonResponse({'ok': True,
+                         'message': f"Successfully linked student ID {token_user.student_id} "
+                                    f"to {github_username}",
+                         'user': user_serializer.data.get('url')},
+                        status=status.HTTP_201_CREATED)
