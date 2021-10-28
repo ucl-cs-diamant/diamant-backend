@@ -61,7 +61,10 @@ class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
 
     @staticmethod
     def get_user_details(obj):
-        return {'user_pk': obj.user.pk, 'name': obj.user.github_username,
+        name = None
+        if not obj.user.usersettings.hide_identity:
+            name = getattr(obj.user, UserSettings.DisplayNameSettings(obj.user.usersettings.display_name).name.lower())
+        return {'user_pk': obj.user.pk, 'name': name,
                 'year': obj.user.year, 'programme': obj.user.programme}
 
     # todo: replace with built-in 'id' field
@@ -71,13 +74,13 @@ class UserPerformanceSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = UserPerformance
-        fields = ['pk', 'url', 'mmr', 'confidence', 'games_played', 'league', 'user', 'user_details']
+        fields = ['pk', 'url', 'code', 'mmr', 'confidence', 'games_played', 'league', 'user', 'user_details']
 
 
 class UserSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email_address', 'github_username', 'student_id']
+        fields = ['id', 'url', 'email_address', 'github_username', 'student_id']
 
 
 class UserCodeSerializer(serializers.HyperlinkedModelSerializer):
