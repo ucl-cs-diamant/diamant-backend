@@ -8,7 +8,7 @@ from django.core.files import File
 from django.core.cache import cache
 from django.utils import timezone
 
-from game_engine.models import User, UserCode, UserPerformance
+from game_engine.models import User, UserCode, UserPerformance, UserSettings
 
 from git import Repo
 import os
@@ -199,6 +199,7 @@ def create_or_update_user_code(branch: tuple, clone_working_dir, repo, user_inst
     save_code_archive(clone_working_dir, code_instance, repo, branch_name)
     code_instance.save()
     UserPerformance.objects.get_or_create(code=code_instance, user=code_instance.user)
+    UserSettings.objects.get_or_create(user=user_instance)
 
 
 def create_or_update_branches(user_instance: User, repo: Repo, clone_working_dir):
