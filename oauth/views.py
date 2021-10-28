@@ -1,5 +1,6 @@
 import os
 
+from django.contrib.auth import logout
 from django.http import JsonResponse
 # from django.shortcuts import render
 # from django.views.decorators.csrf import csrf_exempt
@@ -111,3 +112,9 @@ def link_account(request):
                                     f"to {github_username}",
                          'user': user_serializer.data.get('url')},
                         status=status.HTTP_201_CREATED)
+
+
+def logout_view(request):
+    logout(request)
+
+    return JsonResponse({'ok': True, 'message': 'Logged out.'}, status=status.HTTP_200_OK)
