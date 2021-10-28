@@ -8,6 +8,7 @@ from django.shortcuts import redirect
 from rest_framework import status
 
 from game_engine.models import User
+from game_engine.serializers import UserSerializer
 from . import utils
 import urllib.parse
 
@@ -67,7 +68,13 @@ def oauth_code_callback(request):
 
     success_response = {'ok': True, 'message': f"Logged in as {github_ident['login']}."}
     if not User.objects.filter(github_username=github_ident['login']).exists():
-        success_response['redirect'] = 'oauth/link_account'
+        success_response['redirect'] = 'link_account'
+        return JsonResponse(success_response)
+
+    user_serializer = UserSerializer(User.objects.get(github_username=github_ident['login']),
+                                     many=False,
+                                     context={'request': request})
+    success_response['user'] = user_serializer.data.get('url')
     return JsonResponse(success_response)
 
 
