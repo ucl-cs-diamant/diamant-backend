@@ -1,5 +1,6 @@
 import os
 
+from django.contrib.auth import logout
 from django.http import JsonResponse
 # from django.shortcuts import render
 # from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +9,7 @@ from django.shortcuts import redirect
 from rest_framework import status
 
 from game_engine.models import User
+from game_engine.serializers import UserSerializer
 from . import utils
 import urllib.parse
 
@@ -67,7 +69,13 @@ def oauth_code_callback(request):
 
     success_response = {'ok': True, 'message': f"Logged in as {github_ident['login']}."}
     if not User.objects.filter(github_username=github_ident['login']).exists():
-        success_response['redirect'] = 'oauth/link_account'
+        success_response['redirect'] = 'link_account'
+        return JsonResponse(success_response)
+
+    user_serializer = UserSerializer(User.objects.get(github_username=github_ident['login']),
+                                     many=False,
+                                     context={'request': request})
+    success_response['user'] = user_serializer.data.get('url')
     return JsonResponse(success_response)
 
 
@@ -96,5 +104,17 @@ def link_account(request):
 
     token_user.github_username = github_username
     token_user.save()
-    return JsonResponse({'ok': True, 'message': f"Successfully linked student ID {token_user.student_id} "
-                                                f"to {github_username}"}, status=status.HTTP_201_CREATED)
+    user_serializer = UserSerializer(token_user,
+                                     many=False,
+                                     context={'request': request})
+    return JsonResponse({'ok': True,
+                         'message': f"Successfully linked student ID {token_user.student_id} "
+                                    f"to {github_username}",
+                         'user': user_serializer.data.get('url')},
+                        status=status.HTTP_201_CREATED)
+
+
+def logout_view(request):
+    logout(request)
+
+    return JsonResponse({'ok': True, 'message': 'Logged out.'}, status=status.HTTP_200_OK)

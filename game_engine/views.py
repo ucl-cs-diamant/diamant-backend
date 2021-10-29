@@ -37,7 +37,16 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=True)
     def performance_list(self, request, pk=None):
-        objects = UserPerformance.objects.filter(user_id=pk, code__primary=True)
+        filter_args = {'user_id': pk, 'code__primary': True}
+
+        include_non_primary = request.query_params.get("non_primary", "false")
+        try:
+            if strtobool(include_non_primary):
+                del(filter_args['code__primary'])
+        except ValueError:
+            pass
+
+        objects = UserPerformance.objects.filter(**filter_args)
         if objects.count() == 0:
             return Response(None, status=status.HTTP_204_NO_CONTENT)
         serializer = UserPerformanceSerializer(objects, many=True, context={'request': request})
