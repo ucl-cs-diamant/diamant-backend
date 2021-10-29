@@ -42,7 +42,7 @@ ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
 ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
 
 CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE=True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
 
