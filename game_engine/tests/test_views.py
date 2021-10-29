@@ -59,10 +59,13 @@ class TestViews(TestCase):
                                                                  confidence=8.33333,
                                                                  code=user_code)
         user_performance.save()
+        models.UserSettings.objects.create(user=user)
+
         expected = {'url': f'http://testserver/api/user_performances/{user_performance.pk}/',
+                    'code': f'http://testserver/api/code_list/{user_code.pk}/',
                     'user_details': {
                         'user_pk': user.pk,
-                        'name': user.github_username,
+                        'name': None,
                         'year': user.year,
                         'programme': user.programme,
                     },
@@ -130,7 +133,7 @@ class TestViews(TestCase):
                                                                  mmr=25.00,
                                                                  confidence=8.33333,
                                                                  code=user_code)
-        user_performance.save()
+        models.UserSettings.objects.create(user=user)
 
         user2 = create_user(2)
         user_code2 = create_user_code(user2)
@@ -138,26 +141,32 @@ class TestViews(TestCase):
                                                                   mmr=27.00,
                                                                   confidence=8.33333,
                                                                   code=user_code2)
-        user_performance2.save()
+        models.UserSettings.objects.create(user=user2)
 
         request = factory.get('/', {'sort': 'mmr', 'order': 'desc'})
         response = view(request)
 
         key_order = UserPerformanceSerializer.Meta.fields
         expected = [OrderedDict(
-            [('url', f'http://testserver/api/user_performances/{user_performance2.pk}/'), ('user_details',
-                                                                                       {'user_pk': user2.pk,
-                                                                                        'name': user2.github_username,
-                                                                                        'year': user2.year,
-                                                                                        'programme': user2.programme}),
+            [('pk', user_performance2.pk),
+             ('url', f'http://testserver/api/user_performances/{user_performance2.pk}/'),
+             ('code', f'http://testserver/api/code_list/{user_code2.pk}/'),
+             ('user_details',
+              {'user_pk': user2.pk,
+               'name': None,
+               'year': user2.year,
+               'programme': user2.programme}),
              ('pk', user_performance2.pk),
              ('mmr', Decimal('27.000000')), ('confidence', Decimal('8.3333300')),
              ('games_played', 0), ('league', 0), ('user', f'http://testserver/api/users/{user2.pk}/')]), OrderedDict(
-            [('url', f'http://testserver/api/user_performances/{user_performance.pk}/'), ('user_details',
-                                                                                      {'user_pk': user.pk,
-                                                                                       'name': user.github_username,
-                                                                                       'year': user.year,
-                                                                                       'programme': user.programme}),
+            [('pk', user_performance.pk),
+             ('url', f'http://testserver/api/user_performances/{user_performance.pk}/'),
+             ('code', f'http://testserver/api/code_list/{user_code.pk}/'),
+             ('user_details',
+              {'user_pk': user.pk,
+               'name': None,
+               'year': user.year,
+               'programme': user.programme}),
              ('pk', user_performance.pk),
              ('mmr', Decimal('25.000000')), ('confidence', Decimal('8.3333300')), ('games_played', 0),
              ('league', 0), ('user', f'http://testserver/api/users/{user.pk}/')])]
@@ -175,7 +184,7 @@ class TestViews(TestCase):
                                                                  mmr=25.00,
                                                                  confidence=8.33333,
                                                                  code=user_code)
-        user_performance.save()
+        models.UserSettings.objects.create(user=user)
 
         user2 = create_user(2)
         user_code2 = create_user_code(user2)
@@ -183,7 +192,7 @@ class TestViews(TestCase):
                                                                   mmr=27.00,
                                                                   confidence=8.33333,
                                                                   code=user_code2)
-        user_performance2.save()
+        models.UserSettings.objects.create(user=user2)
 
         request = factory.get('/', {'sort': 'mmr', 'order': 'asc'})
         response = view(request)
@@ -193,9 +202,10 @@ class TestViews(TestCase):
         expected = [
             OrderedDict(
                 [('url', f'http://testserver/api/user_performances/{user_performance.pk}/'),
+                 ('code', f'http://testserver/api/code_list/{user_code.pk}/'),
                  ('user_details',
                   {'user_pk': user.pk,
-                   'name': user.github_username,
+                   'name': None,
                    'year': user.year,
                    'programme': user.programme}),
                  ('pk', user_performance.pk),
@@ -206,9 +216,10 @@ class TestViews(TestCase):
                  ('user', f'http://testserver/api/users/{user.pk}/')]),
             OrderedDict(
                 [('url', f'http://testserver/api/user_performances/{user_performance2.pk}/'),
+                 ('code', f'http://testserver/api/code_list/{user_code2.pk}/'),
                  ('user_details',
                   {'user_pk': user2.pk,
-                   'name': user2.github_username,
+                   'name': None,
                    'year': user2.year,
                    'programme': user2.programme}),
                  ('pk', user_performance2.pk),
