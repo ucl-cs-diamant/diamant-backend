@@ -6,6 +6,6 @@ FROM python:3.8
 WORKDIR /app
 COPY requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
-RUN pip3 install uvicorn
+RUN pip3 install uvicorn[standard] gunicorn
 COPY . .
-CMD ["python3", "-m", "Diamant.asgi:application", "-k", "uvicorn.workers.UvicornWorker"]
+CMD ["gunicorn", "Diamant.asgi:application", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0"]
