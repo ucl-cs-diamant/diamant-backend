@@ -38,7 +38,7 @@ if len(missing_config := [key for key in ['GITHUB_OAUTH_CLIENT_ID',
                                           'GITHUB_OAUTH_CALLBACK_URI'] if os.environ.get(key) is None]):
     warnings.warn(f"Missing environment/conf variable(s) {', '.join(missing_config)}")
 
-ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
+ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com', 'diamantleague.com']
 ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
 
 CSRF_COOKIE_SECURE = True
