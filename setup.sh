@@ -63,6 +63,12 @@ do
   sudo docker rm "$cid"
 done
 
+
+echo "$github_token" | sudo docker secret create GITHUB_API_TOKEN -
+echo "$github_username" | sudo docker secret create GITHUB_USERNAME -
+echo "$user_passwd" | sudo docker secret create USER_PASSWORD -
+
+
 sudo docker run --restart always -d -p 5672:5672 rabbitmq
 
 sudo docker swarm leave --force 2>/dev/null || echo
@@ -86,6 +92,7 @@ sudo docker tag gamerunner localhost:5000/gamerunner
 sudo docker push localhost:5000/gamerunner
 
 sudo docker service create --detach -e GAMESERVER_HOST="$orchestrator_ip" -e GAMESERVER_PORT=8000 --replicas 12 --name gamerunner_service localhost:5000/gamerunner
+
 
 
 setup_backend() {

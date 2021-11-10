@@ -17,3 +17,4 @@ trueskill
 mock
 django-cors-headers~=3.7.0
 numpy
+whitenoise~=5.0.0

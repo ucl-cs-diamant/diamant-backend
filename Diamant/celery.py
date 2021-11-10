@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 from celery import Celery
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Diamant.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Diamant.settings_prod')
 
 
 app = Celery('Diamant')

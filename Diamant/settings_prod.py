@@ -26,21 +26,23 @@ load_dotenv(Path.joinpath(BASE_DIR, ".env"))
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-1i0n*qg+r%5tpd!1k#_zx6z7&0^#f%(_gl#2kb5o5%m!jogw&c')
-if 'insecure' in SECRET_KEY:
-    warnings.warn('DJANGO_SECRET_KEY not specified, falling back to development secret key')
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
+# noinspection DuplicatedCode
 if len(missing_config := [key for key in ['GITHUB_OAUTH_CLIENT_ID',
                                           'GITHUB_OAUTH_CLIENT_SECRET',
                                           'GITHUB_OAUTH_SCOPES',
                                           'GITHUB_OAUTH_CALLBACK_URI'] if os.environ.get(key) is None]):
     warnings.warn(f"Missing environment/conf variable(s) {', '.join(missing_config)}")
 
-ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com']
+ALLOWED_HOSTS = ['localhost', 'hopefullyup.compositegrid.com', 'diamantleague.com']
 ALLOWED_CIDR_NETS = ['172.17.0.0/16', '192.168.0.0/16', '10.24.0.0/16']
+
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
 
